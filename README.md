@@ -39,9 +39,20 @@ To configure the plugin, go to **Administration > Plugins** and click on **Confi
 *   **API Key**: Your API key. The key is stored securely and will be masked in the user interface.
 *   **Model**: The AI model to use for summary generation (e.g., `gpt-4o-mini`).
 *   **System Prompt**: The instructions given to the AI model on how to summarize the issue.
-*   **Max Tokens**: The maximum number of tokens for the generated summary.
+*   **Model Parameters (JSON)**: A JSON object of request parameters for the selected model (e.g., `{"max_completion_tokens":800,"temperature":0.2}`).
+*   **Include journal changes**: Include journal attribute changes in the AI payload (disable to reduce token usage).
+*   **Max subtask depth**: Limits how deep the generator traverses subtask trees when using the subtask summary option (0 disables).
+*   **Debug logging**: Logs request/response payloads to help troubleshoot API errors.
 
 ![Plugin Settings](docs/images/settings.png)
+
+### Keeping Sidekiq in sync with settings
+
+Redmine caches plugin settings per process. To ensure Sidekiq workers see updates promptly, you have a few options:
+
+* **Restart Sidekiq workers** after changing plugin settings (most reliable, clears the in-memory cache).
+* **Clear the settings cache** from a Rails console by running `Setting.clear_cache` (then let Sidekiq process the next job).
+* **Rely on automatic cache refresh during jobs**: this plugin clears the settings cache at the start of each summary job when `Setting.clear_cache` is available, so updated settings are picked up without a restart.
 
 ## Usage
 
@@ -56,6 +67,8 @@ For the plugin to be active on a project, you must enable the **AI Summary** mod
 1.  Navigate to any issue in a project where the module is enabled.
 2.  If you have the required permissions, you will see a "Generate Summary" button.
 3.  Click the button to generate a new summary. The latest summary will be saved and displayed.
+4.  If **Max subtask depth** is set above 0, you will also see a "Generate Summary (with subtasks)" button.
+5.  Project admins can override the subtask depth from **Project Settings > AI Summary** (requires the project permission).
 
 Before generating a summary, the issue page will look like this:
 

@@ -41,9 +41,20 @@ mkdir -p tmp/test-results
 
 RUBY_VERSION="$(detect_ruby_version)"
 
+plugin_root="plugins/$PLUGIN_NAME"
+
+if [ -d "$plugin_root/spec" ]; then
+  TEST_CMD="bundle exec rspec \"$plugin_root/spec\" --format progress"
+elif [ -d "$plugin_root/test" ]; then
+  TEST_CMD="bundle exec rails test \"$plugin_root/test\""
+else
+  echo "No spec/ or test/ directory found for $PLUGIN_NAME. Nothing to run." >&2
+  exit 1
+fi
+
 if [ -n "$RUBY_VERSION" ]; then
   if command -v "$MISE_BIN" >/dev/null 2>&1; then
-    "$MISE_BIN" exec "ruby@$RUBY_VERSION" -- bundle exec rspec "plugins/$PLUGIN_NAME/spec" --format progress
+    "$MISE_BIN" exec "ruby@$RUBY_VERSION" -- bash -lc "$TEST_CMD"
   else
     echo "mise is required to run tests with Ruby $RUBY_VERSION. Please run ./.codex/test_setup.sh first." >&2
     exit 1
@@ -53,5 +64,5 @@ else
     echo "Bundler is not available. Please run ./.codex/test_setup.sh first." >&2
     exit 1
   fi
-  bundle exec rspec "plugins/$PLUGIN_NAME/spec" --format progress
+  bash -lc "$TEST_CMD"
 fi

@@ -1,9 +1,16 @@
 <%# locals: (issue:, summary:) %>
-<div id="issue-summary" data-status="<%= summary&.status || 'new' %>">
+<div id="issue-summary"
+     data-status="<%= summary&.status || 'new' %>"
+     data-summary-text="<%= summary&.summary.present? ? json_escape(summary.summary.to_json) : '\"\"' %>">
   <hr />
   <div class="description">
     <div class="contextual">
-      <% if User.current.allowed_to?(:generate_issue_summary, issue.project) && !['stale', 'generating'].include?(summary&.status) %>
+      <% can_generate = User.current.admin? || User.current.allowed_to?(:generate_issue_summary, issue.project) %>
+      <% can_generate_subtasks = User.current.admin? || User.current.allowed_to?(:generate_issue_summary_with_subtasks, issue.project) %>
+      <% can_destroy = User.current.admin? || User.current.allowed_to?(:destroy_issue_summary, issue.project) %>
+      <% subtask_depth = RedmineAiSummary::SettingsResolver.subtask_max_depth(issue.project).to_i %>
+      <% allow_subtasks = subtask_depth.positive? %>
+      <% if can_generate && summary&.status != 'generating' %>
         <%= link_to t('redmine_ai_summary.buttons.generate_summary'),
             issue_ai_summaries_path(issue),
             method: :post,
@@ -11,6 +18,15 @@
             class: 'icon icon-summary',
             id: 'generate-summary-button',
             data: { confirm: t('redmine_ai_summary.text.are_you_sure_generate_summary') } %>
+        <% if allow_subtasks && can_generate_subtasks %>
+          <%= link_to t('redmine_ai_summary.buttons.generate_summary_with_subtasks'),
+              issue_ai_summaries_path(issue, include_subtasks: '1'),
+              method: :post,
+              remote: true,
+              class: 'icon icon-summary',
+              id: 'generate-summary-with-subtasks-button',
+              data: { confirm: t('redmine_ai_summary.text.are_you_sure_generate_summary_with_subtasks') } %>
+        <% end %>
       <% end %>
     </div>
     <p>
@@ -30,11 +46,24 @@
 
     <% if summary&.summary.present? %>
       <div class="wiki <%= 'summary-generating' if summary.status == 'generating' %>">
-        <% if summary.status == 'stale' %>
+          <% if summary.status == 'stale' %>
           <div class="warning">
             <%= t('redmine_ai_summary.text.summary_is_stale') %>
-            <% if User.current.allowed_to?(:generate_issue_summary, issue.project) %>
-              <%= link_to t('redmine_ai_summary.buttons.regenerate'), issue_ai_summaries_path(issue), method: :post, remote: true, class: 'icon icon-summary', id: 'generate-summary-button' %>
+            <% if can_generate %>
+              <%= link_to t('redmine_ai_summary.buttons.regenerate'),
+                  issue_ai_summaries_path(issue),
+                  method: :post,
+                  remote: true,
+                  class: 'icon icon-summary',
+                  id: 'regenerate-summary-button' %>
+              <% if allow_subtasks && can_generate_subtasks %>
+                <%= link_to t('redmine_ai_summary.buttons.regenerate_with_subtasks'),
+                    issue_ai_summaries_path(issue, include_subtasks: '1'),
+                    method: :post,
+                    remote: true,
+                    class: 'icon icon-summary',
+                    id: 'regenerate-summary-with-subtasks-button' %>
+              <% end %>
             <% end %>
           </div>
         <% end %>
@@ -48,5 +77,32 @@
         <p><%= t('redmine_ai_summary.text.no_summary_available') %></p>
       <% end %>
     <% end %>
+    <div class="contextual">
+      <% if summary&.error_message.present? %>
+        <span class="icon icon-warning summary-action"
+              title="<%= t('redmine_ai_summary.labels.summary_error', message: summary.error_message) %>"
+              aria-label="<%= t('redmine_ai_summary.labels.summary_error', message: summary.error_message) %>"
+              data-action="copy_error"
+              data-error-message="<%= summary.error_message.to_s %>"></span>
+      <% end %>
+      <% if summary&.summary.present? %>
+        <%= link_to t('redmine_ai_summary.buttons.quote_summary'),
+            '#',
+            class: 'icon icon-quote summary-action',
+            data: { action: 'quote' } %>
+        <%= link_to t('redmine_ai_summary.buttons.copy_summary'),
+            '#',
+            class: 'icon icon-copy summary-action',
+            data: { action: 'copy' } %>
+      <% end %>
+      <% if can_destroy && summary.present? %>
+        <%= link_to t('redmine_ai_summary.buttons.destroy_summary'),
+            issue_ai_summary_path(issue, summary),
+            method: :delete,
+            remote: true,
+            class: 'icon icon-del',
+            data: { confirm: t('redmine_ai_summary.text.are_you_sure_destroy_summary') } %>
+      <% end %>
+    </div>
   </div>
 </div>

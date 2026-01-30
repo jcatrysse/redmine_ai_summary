@@ -1,7 +1,8 @@
 class GenerateSummaryJob < ActiveJob::Base
   queue_as :default
 
-  def perform(issue_id, user_id)
+  def perform(issue_id, user_id, subtask_max_depth = nil)
+    RedmineAiSummary::SettingsResolver.reload!
     issue = Issue.find_by(id: issue_id)
     user = User.find_by(id: user_id)
     return unless issue && user
@@ -10,12 +11,28 @@ class GenerateSummaryJob < ActiveJob::Base
     summary.status = 'generating'
     summary.save!
 
-    success, generated_summary = RedmineAiSummary::SummaryGenerator.generate(issue, user)
+    begin
+      success, generated_summary, error_message = RedmineAiSummary::SummaryGenerator.generate(
+        issue,
+        user,
+        subtask_max_depth: subtask_max_depth
+      )
 
-    if success
-      generated_summary.update(status: 'up_to_date')
-    else
-      summary.reload.update(status: 'stale')
+      if success
+        error_message = if RedmineAiSummary::SettingsResolver.debug_logging_enabled?(issue.project)
+                          summary.reload.error_message
+                        end
+        summary.reload.update(
+          status: 'up_to_date',
+          error_message: error_message,
+          summary: generated_summary&.summary || summary.summary
+        )
+      else
+        summary.reload.update(status: 'stale', error_message: error_message)
+      end
+    rescue StandardError => e
+      Rails.logger.error "AI Summary job failed for issue ##{issue_id}: #{e.message}"
+      summary.reload.update(status: 'stale', error_message: e.message) if summary.persisted?
     end
   end
 end

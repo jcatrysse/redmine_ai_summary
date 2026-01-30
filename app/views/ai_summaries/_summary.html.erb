@@ -1,78 +1,196 @@
-<style>
-  .summary-generating {
-    opacity: 0.5;
-  }
-  .generating-text {
-    margin-left: 10px;
-    font-style: italic;
-    color: #777;
-  }
-</style>
-
-<div id="issue-summary-container">
-  <% summary = IssueSummary.includes(:updater).find_by(issue_id: @issue.id) %>
-  <%= render partial: 'ai_summaries/summary_content', locals: { issue: @issue, summary: summary } %>
-</div>
-
-<script>
-  (function() {
-    var container = document.getElementById('issue-summary-container');
-    var issueId = <%= @issue.id %>;
-    var pollingInterval;
-
-    window.startSummaryPolling = function() {
-      if (pollingInterval) return;
-      pollingInterval = setInterval(pollSummaryStatus, 3000);
+<% summary = IssueSummary.includes(:updater).find_by(issue_id: @issue.id) %>
+<% can_view = User.current.admin? || User.current.allowed_to?(:view_issue_summary, @issue.project) %>
+<% can_generate = User.current.admin? || User.current.allowed_to?(:generate_issue_summary, @issue.project) %>
+<% can_generate_subtasks = User.current.admin? || User.current.allowed_to?(:generate_issue_summary_with_subtasks, @issue.project) %>
+<% if summary.present? ? can_view : (can_generate || can_generate_subtasks) %>
+  <style>
+    .summary-generating {
+      opacity: 0.5;
     }
-
-    function stopPolling() {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
+    .generating-text {
+      margin-left: 10px;
+      font-style: italic;
+      color: #777;
     }
-
-    function showFlashMessage(message, type) {
-      var noticeElement = document.getElementById('summary-notice');
-      if (noticeElement) {
-        noticeElement.innerText = message;
-        noticeElement.className = 'flash ' + type;
-        noticeElement.style.display = 'block';
-        setTimeout(function() {
-          noticeElement.style.display = 'none';
-        }, 3000);
-      }
+    .summary-action {
+      cursor: pointer;
     }
+  </style>
 
-    function pollSummaryStatus() {
-      if (document.hidden) {
-        return;
+  <div id="issue-summary-container">
+    <%= render partial: 'ai_summaries/summary_content', locals: { issue: @issue, summary: summary } %>
+  </div>
+
+  <script>
+    (function() {
+      var container = document.getElementById('issue-summary-container');
+      var issueId = <%= @issue.id %>;
+      var pollingInterval;
+
+      window.startSummaryPolling = function() {
+        if (pollingInterval) return;
+        pollingInterval = setInterval(pollSummaryStatus, 3000);
       }
 
-      var wasGenerating = container.querySelector('#issue-summary').dataset.status === 'generating';
+      function stopPolling() {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+      }
 
-      fetch('/issues/' + issueId + '/ai_summaries/content')
-        .then(function(response) { return response.text(); })
-        .then(function(html) {
-          var tempDiv = document.createElement('div');
-          tempDiv.innerHTML = html;
+      function showFlashMessage(message, type) {
+        var noticeElement = document.getElementById('summary-notice');
+        if (noticeElement) {
+          noticeElement.innerText = message;
+          noticeElement.className = 'flash ' + type;
+          noticeElement.style.display = 'block';
+          setTimeout(function() {
+            noticeElement.style.display = 'none';
+          }, 3000);
+        }
+      }
 
-          var newStatus = tempDiv.querySelector('#issue-summary').dataset.status;
-          container.innerHTML = html;
+      function pollSummaryStatus() {
+        if (document.hidden) {
+          return;
+        }
 
-          if (newStatus === 'up_to_date') {
-            stopPolling();
-            if (wasGenerating) {
-              showFlashMessage('<%= t('redmine_ai_summary.notices.summary_generated') %>', 'notice');
+        var issueSummary = container.querySelector('#issue-summary');
+        if (!issueSummary) {
+          stopPolling();
+          return;
+        }
+
+        var wasGenerating = issueSummary.dataset.status === 'generating';
+
+        fetch('/issues/' + issueId + '/ai_summaries/content')
+          .then(function(response) { return response.text(); })
+          .then(function(html) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+
+            var newSummary = tempDiv.querySelector('#issue-summary');
+            var newStatus = newSummary ? newSummary.dataset.status : 'new';
+            container.innerHTML = html;
+
+            if (newStatus === 'up_to_date') {
+              stopPolling();
+              if (wasGenerating) {
+                showFlashMessage('<%= t('redmine_ai_summary.notices.summary_generated') %>', 'notice');
+              }
+            } else if (wasGenerating && newStatus === 'stale') {
+              stopPolling();
+              showFlashMessage('<%= t('redmine_ai_summary.notices.summary_failed') %>', 'error');
             }
-          } else if (wasGenerating && newStatus === 'stale') {
-            stopPolling();
-            showFlashMessage('<%= t('redmine_ai_summary.notices.summary_failed') %>', 'error');
+          });
+      }
+
+      var initialSummary = container.querySelector('#issue-summary');
+      if (initialSummary && initialSummary.dataset.status === 'generating') {
+        window.startSummaryPolling();
+      }
+
+      function quoteText(text) {
+        return text.split(/\r?\n/).map(function(line) {
+          return '> ' + line;
+        }).join('\n');
+      }
+
+      function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text);
+        }
+
+        return new Promise(function(resolve, reject) {
+          var textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          try {
+            document.execCommand('copy');
+            resolve();
+          } catch (error) {
+            reject(error);
+          } finally {
+            document.body.removeChild(textarea);
           }
         });
-    }
+      }
 
-    // Start polling on page load if summary is already being generated
-    if (container.querySelector('#issue-summary').dataset.status === 'generating') {
-      window.startSummaryPolling();
-    }
-  })();
-</script>
+      function handleSummaryAction(event) {
+        var actionButton = event.target.closest('.summary-action');
+        if (!actionButton) return;
+
+        event.preventDefault();
+        var issueSummary = container.querySelector('#issue-summary');
+        if (!issueSummary) return;
+
+        if (actionButton.dataset.action === 'copy') {
+          var summaryText = '';
+          try {
+            summaryText = JSON.parse(issueSummary.dataset.summaryText || '""');
+          } catch (error) {
+            summaryText = issueSummary.dataset.summaryText || '';
+          }
+          if (!summaryText.trim()) return;
+          copyToClipboard(summaryText)
+            .then(function() {
+              showFlashMessage('<%= t('redmine_ai_summary.notices.summary_copied') %>', 'notice');
+            })
+            .catch(function() {
+              showFlashMessage('<%= t('redmine_ai_summary.notices.summary_copy_failed') %>', 'error');
+            });
+        }
+
+        if (actionButton.dataset.action === 'copy_error') {
+          var errorMessage = actionButton.dataset.errorMessage || '';
+          if (!errorMessage.trim()) return;
+          copyToClipboard(errorMessage)
+            .then(function() {
+              showFlashMessage('<%= t('redmine_ai_summary.notices.error_copied') %>', 'notice');
+            })
+            .catch(function() {
+              showFlashMessage('<%= t('redmine_ai_summary.notices.error_copy_failed') %>', 'error');
+            });
+        }
+
+        if (actionButton.dataset.action === 'quote') {
+          var summaryText = '';
+          try {
+            summaryText = JSON.parse(issueSummary.dataset.summaryText || '""');
+          } catch (error) {
+            summaryText = issueSummary.dataset.summaryText || '';
+          }
+          if (!summaryText.trim()) return;
+          var notesField = document.getElementById('issue_notes');
+          if (!notesField) return;
+
+          if (notesField.offsetParent === null) {
+            if (typeof showAndScrollTo === 'function') {
+              showAndScrollTo('update', 'issue_notes');
+            } else {
+              var updateSection = document.getElementById('update');
+              if (updateSection) {
+                updateSection.style.display = 'block';
+              }
+            }
+            notesField = document.getElementById('issue_notes');
+            if (!notesField) return;
+          }
+
+          var quoted = quoteText(summaryText);
+          if (notesField.value.trim()) {
+            notesField.value = notesField.value.replace(/\s*$/, '') + '\n\n' + quoted;
+          } else {
+            notesField.value = quoted;
+          }
+
+          notesField.focus();
+        }
+      }
+
+      container.addEventListener('click', handleSummaryAction);
+    })();
+  </script>
+<% end %>

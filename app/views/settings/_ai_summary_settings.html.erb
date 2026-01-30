@@ -1,10 +1,22 @@
+<style>
+  .ai-summary-action-button {
+    cursor: pointer;
+  }
+</style>
+
 <p><label for="auto_generate"><%= l(:'redmine_ai_summary.settings.auto_generate') %></label>
-<%= check_box_tag 'settings[auto_generate]', '1', Setting.plugin_redmine_ai_summary['auto_generate'] %>
+<%= hidden_field_tag 'settings[auto_generate]', '0' %>
+<%= check_box_tag 'settings[auto_generate]', '1', Setting.plugin_redmine_ai_summary['auto_generate'] == '1' %>
 <span class="description"><%= l(:'redmine_ai_summary.settings.auto_generate_description') %></span></p>
 
 <p><label for="auto_requires_existing_summary"><%= l(:'redmine_ai_summary.settings.auto_requires_existing_summary') %></label>
-<%= check_box_tag 'settings[auto_requires_existing_summary]', '1', Setting.plugin_redmine_ai_summary['auto_requires_existing_summary'] %>
+<%= hidden_field_tag 'settings[auto_requires_existing_summary]', '0' %>
+<%= check_box_tag 'settings[auto_requires_existing_summary]', '1', Setting.plugin_redmine_ai_summary['auto_requires_existing_summary'] == '1' %>
 <span class="description"><%= l(:'redmine_ai_summary.settings.auto_requires_existing_summary_description') %></span></p>
+
+<p><label for="subtask_summary_max_depth"><%= l(:'redmine_ai_summary.settings.subtask_summary_max_depth') %></label>
+<%= number_field_tag 'settings[subtask_summary_max_depth]', Setting.plugin_redmine_ai_summary['subtask_summary_max_depth'], min: 0, step: 1 %>
+<span class="description"><%= l(:'redmine_ai_summary.settings.subtask_summary_max_depth_description') %></span></p>
 
 <p><label for="api_endpoint"><%= l(:'redmine_ai_summary.settings.api_endpoint') %></label>
 <%= text_field_tag 'settings[api_endpoint]', Setting.plugin_redmine_ai_summary['api_endpoint'] %>
@@ -20,6 +32,32 @@
 <p><label for="model"><%= l(:'redmine_ai_summary.settings.model') %></label>
 <%= text_field_tag 'settings[model]', Setting.plugin_redmine_ai_summary['model'] %>
 <span class="description"><%= l(:'redmine_ai_summary.settings.model_description') %></span></p>
+
+<p><label for="model_parameters_json"><%= l(:'redmine_ai_summary.settings.model_parameters_json') %></label>
+<span class="description"><%= l(:'redmine_ai_summary.settings.model_parameters_json_description') %></span>
+<%= text_area_tag 'settings[model_parameters_json]',
+                  Setting.plugin_redmine_ai_summary['model_parameters_json'],
+                  rows: 6,
+                  cols: 50 %>
+<span class="description"><%= l(:'redmine_ai_summary.settings.model_parameters_json_example') %></span></p>
+
+<p>
+  <label><%= l(:'redmine_ai_summary.settings.api_tools') %></label>
+  <%= button_tag l(:'redmine_ai_summary.buttons.test_connection'),
+                 type: 'button',
+                 class: 'button ai-summary-action-button',
+                 id: 'ai-summary-test-connection',
+                 data: { url: url_for(controller: 'ai_summary_settings', action: 'test', only_path: true) } %>
+  <%= button_tag l(:'redmine_ai_summary.buttons.list_models'),
+                 type: 'button',
+                 class: 'button ai-summary-action-button',
+                 id: 'ai-summary-list-models',
+                 data: { url: url_for(controller: 'ai_summary_settings', action: 'models', only_path: true) } %>
+  <span class="description"><%= l(:'redmine_ai_summary.settings.api_tools_description') %></span>
+</p>
+
+<div id="ai-summary-api-result" class="flash" style="display:none;"></div>
+<div id="ai-summary-models" class="box" style="display:none;"></div>
 
 <p><label for="system_prompt"><%= l(:'redmine_ai_summary.settings.system_prompt') %></label>
 <span class="description"><%= l(:'redmine_ai_summary.settings.system_prompt_description') %></span>
@@ -50,6 +88,82 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<p><label for="max_completion_tokens"><%= l(:'redmine_ai_summary.settings.max_completion_tokens') %></label>
-<%= text_field_tag 'settings[max_completion_tokens]', Setting.plugin_redmine_ai_summary['max_completion_tokens'] %>
-<span class="description"><%= l(:'redmine_ai_summary.settings.max_completion_tokens_description') %></span></p>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const testButton = document.getElementById('ai-summary-test-connection');
+  const listButton = document.getElementById('ai-summary-list-models');
+  const resultBox = document.getElementById('ai-summary-api-result');
+  const modelsBox = document.getElementById('ai-summary-models');
+  const csrfToken = document.querySelector('meta[name="csrf-token"]');
+
+  function showResult(message, type) {
+    if (!resultBox) return;
+    resultBox.textContent = message;
+    resultBox.className = 'flash ' + type;
+    resultBox.style.display = 'block';
+  }
+
+  function showModels(models) {
+    if (!modelsBox) return;
+    modelsBox.innerHTML = '';
+    if (!models || !models.length) {
+      modelsBox.textContent = '<%= j l('redmine_ai_summary.text.no_models_available') %>';
+      modelsBox.style.display = 'block';
+      return;
+    }
+
+    const list = document.createElement('ul');
+    models.forEach(function(model) {
+      const item = document.createElement('li');
+      item.textContent = model;
+      list.appendChild(item);
+    });
+    modelsBox.appendChild(list);
+    modelsBox.style.display = 'block';
+  }
+
+  if (testButton) {
+    testButton.addEventListener('click', function() {
+      fetch(this.dataset.url, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-Token': csrfToken ? csrfToken.content : '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+      })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          showResult(data.message || '', data.success ? 'notice' : 'error');
+        })
+        .catch(function() {
+          showResult('<%= j l('redmine_ai_summary.text.api_test_failed') %>', 'error');
+        });
+    });
+  }
+
+  if (listButton) {
+    listButton.addEventListener('click', function() {
+      fetch(this.dataset.url, { credentials: 'same-origin' })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          showResult(data.message || '', data.success ? 'notice' : 'error');
+          showModels(data.models || []);
+        })
+        .catch(function() {
+          showResult('<%= j l('redmine_ai_summary.text.api_models_failed') %>', 'error');
+        });
+    });
+  }
+});
+</script>
+
+<p><label for="debug_logging"><%= l(:'redmine_ai_summary.settings.debug_logging') %></label>
+<%= hidden_field_tag 'settings[debug_logging]', '0' %>
+<%= check_box_tag 'settings[debug_logging]', '1', Setting.plugin_redmine_ai_summary['debug_logging'] == '1' %>
+<span class="description"><%= l(:'redmine_ai_summary.settings.debug_logging_description') %></span></p>
+
+<p><label for="include_journal_changes"><%= l(:'redmine_ai_summary.settings.include_journal_changes') %></label>
+<%= hidden_field_tag 'settings[include_journal_changes]', '0' %>
+<%= check_box_tag 'settings[include_journal_changes]', '1', Setting.plugin_redmine_ai_summary['include_journal_changes'] != '0' %>
+<span class="description"><%= l(:'redmine_ai_summary.settings.include_journal_changes_description') %></span></p>

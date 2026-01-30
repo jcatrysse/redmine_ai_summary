@@ -1,0 +1,167 @@
+<%# locals: (project:) %>
+<% plugin_settings = Setting.plugin_redmine_ai_summary %>
+<% sentinel = RedmineAiSummary::Constants::API_KEY_SENTINEL %>
+<% auto_generate_value = RedmineAiSummary::SettingsResolver.project_setting_value(@project, :auto_generate) %>
+<% auto_requires_existing_value = RedmineAiSummary::SettingsResolver.project_setting_value(@project, :auto_requires_existing_summary) %>
+<% debug_logging_value = RedmineAiSummary::SettingsResolver.project_setting_value(@project, :debug_logging) %>
+<% include_journal_changes_value = RedmineAiSummary::SettingsResolver.project_setting_value(@project, :include_journal_changes) %>
+<%= form_with url: project_ai_summary_settings_path(@project), method: :put, local: true do %>
+  <div class="box tabular">
+    <p>
+      <label for="ai_summary_settings_auto_generate">
+        <%= l(:'redmine_ai_summary.settings.auto_generate') %>
+      </label>
+      <%= select_tag(
+            'ai_summary_settings[auto_generate]',
+            options_for_select(
+              [
+                [l(:label_inherit, default: l(:label_default)), ''],
+                [l(:general_text_Yes), '1'],
+                [l(:general_text_No), '0']
+              ],
+              auto_generate_value.nil? ? '' : (auto_generate_value ? '1' : '0')
+            )
+          ) %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.auto_generate_description') %></span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_auto_requires_existing_summary">
+        <%= l(:'redmine_ai_summary.settings.auto_requires_existing_summary') %>
+      </label>
+      <%= select_tag(
+            'ai_summary_settings[auto_requires_existing_summary]',
+            options_for_select(
+              [
+                [l(:label_inherit, default: l(:label_default)), ''],
+                [l(:general_text_Yes), '1'],
+                [l(:general_text_No), '0']
+              ],
+              auto_requires_existing_value.nil? ? '' : (auto_requires_existing_value ? '1' : '0')
+            )
+          ) %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.auto_requires_existing_summary_description') %></span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_subtask_summary_max_depth">
+        <%= l(:'redmine_ai_summary.settings.subtask_summary_max_depth') %>
+      </label>
+      <%= number_field_tag 'ai_summary_settings[subtask_summary_max_depth]',
+                           RedmineAiSummary::SettingsResolver.project_setting_value(@project, :subtask_summary_max_depth),
+                           min: 0,
+                           step: 1,
+                           placeholder: plugin_settings['subtask_summary_max_depth'] %>
+      <span class="description">
+        <%= l(:'redmine_ai_summary.settings.subtask_summary_max_depth_project_description',
+              default: l(:'redmine_ai_summary.settings.subtask_summary_max_depth_description')) %>
+      </span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_api_endpoint"><%= l(:'redmine_ai_summary.settings.api_endpoint') %></label>
+      <%= text_field_tag 'ai_summary_settings[api_endpoint]',
+                         RedmineAiSummary::SettingsResolver.project_setting_value(@project, :api_endpoint),
+                         placeholder: plugin_settings['api_endpoint'] %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.api_endpoint_description') %></span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_api_key"><%= l(:'redmine_ai_summary.settings.api_key') %></label>
+      <%= password_field_tag 'ai_summary_settings[api_key]',
+                             (RedmineAiSummary::SettingsResolver.project_setting_value(@project, :api_key).present? ? sentinel : nil),
+                             autocomplete: 'off' %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.api_key_description') %></span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_model"><%= l(:'redmine_ai_summary.settings.model') %></label>
+      <%= text_field_tag 'ai_summary_settings[model]',
+                         RedmineAiSummary::SettingsResolver.project_setting_value(@project, :model),
+                         placeholder: plugin_settings['model'] %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.model_description') %></span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_model_parameters_json">
+        <%= l(:'redmine_ai_summary.settings.model_parameters_json') %>
+      </label>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.model_parameters_json_description') %></span>
+      <%= text_area_tag 'ai_summary_settings[model_parameters_json]',
+                        RedmineAiSummary::SettingsResolver.project_setting_value(@project, :model_parameters_json),
+                        rows: 6,
+                        cols: 50,
+                        placeholder: plugin_settings['model_parameters_json'] %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.model_parameters_json_example') %></span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_system_prompt"><%= l(:'redmine_ai_summary.settings.system_prompt') %></label>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.system_prompt_description') %></span>
+      <%= text_area_tag 'ai_summary_settings[system_prompt]',
+                        RedmineAiSummary::SettingsResolver.project_setting_value(@project, :system_prompt),
+                        rows: 10,
+                        cols: 50,
+                        placeholder: plugin_settings['system_prompt'] %>
+      <br />
+      <%= link_to l(:'redmine_ai_summary.buttons.reset_prompt'), '#',
+                  id: 'reset-project-prompt-button',
+                  class: 'button',
+                  data: {
+                    default_prompt: Redmine::Plugin.find(:redmine_ai_summary).settings[:default]['system_prompt'],
+                    message: l(:'redmine_ai_summary.settings.confirm_reset_prompt')
+                  } %>
+    </p>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const resetButton = document.getElementById('reset-project-prompt-button');
+      if (resetButton) {
+        resetButton.addEventListener('click', function(event) {
+          event.preventDefault();
+          const confirmMessage = this.dataset.message;
+          if (confirm(confirmMessage)) {
+            const defaultPrompt = this.dataset.defaultPrompt;
+            document.getElementById('ai_summary_settings_system_prompt').value = defaultPrompt;
+          }
+        });
+      }
+    });
+    </script>
+
+    <p>
+      <label for="ai_summary_settings_debug_logging"><%= l(:'redmine_ai_summary.settings.debug_logging') %></label>
+      <%= select_tag(
+            'ai_summary_settings[debug_logging]',
+            options_for_select(
+              [
+                [l(:label_inherit, default: l(:label_default)), ''],
+                [l(:general_text_Yes), '1'],
+                [l(:general_text_No), '0']
+              ],
+              debug_logging_value.nil? ? '' : (debug_logging_value ? '1' : '0')
+            )
+          ) %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.debug_logging_description') %></span>
+    </p>
+
+    <p>
+      <label for="ai_summary_settings_include_journal_changes">
+        <%= l(:'redmine_ai_summary.settings.include_journal_changes') %>
+      </label>
+      <%= select_tag(
+            'ai_summary_settings[include_journal_changes]',
+            options_for_select(
+              [
+                [l(:label_inherit, default: l(:label_default)), ''],
+                [l(:general_text_Yes), '1'],
+                [l(:general_text_No), '0']
+              ],
+              include_journal_changes_value.nil? ? '' : (include_journal_changes_value ? '1' : '0')
+            )
+          ) %>
+      <span class="description"><%= l(:'redmine_ai_summary.settings.include_journal_changes_description') %></span>
+    </p>
+  </div>
+  <%= submit_tag l(:button_save) %>
+<% end %>

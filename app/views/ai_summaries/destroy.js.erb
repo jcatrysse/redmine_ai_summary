@@ -1,0 +1,2 @@
+<% summary = IssueSummary.includes(:creator, :updater).find_by(issue_id: @issue.id) %>
+$("#issue-summary-container").html("<%= j render(partial: 'ai_summaries/summary_content', locals: { issue: @issue, summary: summary }) %>");
