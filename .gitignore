@@ -1,2 +1,4 @@
 /Gemfile.lock
 .volumes
+# Redmine checkout made by .codex/redmine_clone.sh
+/redmine/
