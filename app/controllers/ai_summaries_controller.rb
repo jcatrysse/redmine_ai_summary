@@ -42,9 +42,22 @@ class AiSummariesController < ApplicationController
 
   def find_issue
     @issue = Issue.find(params[:issue_id])
-    render_403 unless @issue.visible?
+    render_403 unless @issue.visible? && issue_description_accessible?
   rescue ActiveRecord::RecordNotFound
     render_404
+  end
+
+  # redmine_view_issue_description refuses the issue page (not Issue#visible?)
+  # to users without view_issue_description; a summary of that issue tells as
+  # much as the page, so the same rule applies here when that plugin is loaded.
+  def issue_description_accessible?
+    return true unless @issue.respond_to?(:description_access_granted?)
+
+    user = User.current
+    user.admin? ||
+      (@issue.assigned_to.present? && user.is_or_belongs_to?(@issue.assigned_to)) ||
+      (@issue.respond_to?(:watcher_access_granted?) && @issue.watcher_access_granted?(user)) ||
+      @issue.description_access_granted?(user)
   end
 
   def check_view_permission

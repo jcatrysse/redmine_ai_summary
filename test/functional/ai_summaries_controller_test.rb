@@ -16,6 +16,9 @@ class AiSummariesControllerTest < ActionController::TestCase
   end
 
   def test_content_is_shown_to_a_user_who_sees_the_issue
+    # With redmine_view_issue_description installed, seeing the issue page takes this permission too.
+    Role.anonymous.add_permission!(:view_issue_description) if Redmine::AccessControl.permission(:view_issue_description)
+
     get :content, params: { issue_id: @issue.id }
 
     assert_response :success
@@ -58,5 +61,29 @@ class AiSummariesControllerTest < ActionController::TestCase
     get :content, params: { issue_id: 999_999 }
 
     assert_response :not_found
+  end
+
+  # redmine_view_issue_description (GEOxyz) refuses the issue page to users
+  # without view_issue_description; the summary of that issue must follow.
+  def test_content_follows_redmine_view_issue_description_when_installed
+    @request.session[:user_id] = 2
+    Issue.any_instance.stubs(:description_access_granted?).returns(false)
+    Issue.any_instance.stubs(:watcher_access_granted?).returns(false)
+
+    get :content, params: { issue_id: @issue.id }
+
+    assert_response :forbidden
+    refute_includes response.body, 'Secret summary text'
+  end
+
+  def test_content_shown_when_redmine_view_issue_description_grants_access
+    @request.session[:user_id] = 2
+    Issue.any_instance.stubs(:description_access_granted?).returns(true)
+    Issue.any_instance.stubs(:watcher_access_granted?).returns(false)
+
+    get :content, params: { issue_id: @issue.id }
+
+    assert_response :success
+    assert_includes response.body, 'Secret summary text'
   end
 end
