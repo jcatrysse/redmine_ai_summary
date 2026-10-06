@@ -18,16 +18,38 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Plugin id | `redmine_ai_summary` |
 | GEOxyz runs today | `main-GEOxyz` |
 | Upstream | tuzumkuru/redmine_ai_summary (main a6f1a93, 2025-10-19, fully contained) |
-| Runs on Redmine 7 as is | DEELS |
+| Runs on Redmine 7 as is | DEELS (before this branch); after: JA |
 | Upstream sync | NIET NODIG |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 2 |
 | Measured on | Redmine 7.0.1 (7.0-stable-GEOxyz + latest 7.0-stable), Rails 8.1.3.1, Ruby 3.3.6, PostgreSQL 16 and MariaDB 10.11 |
 | Branch head when this file was written | `8ebb268` |
+| Migration done on | 2026-10-06, branch head after the work: see `git log` (last code change `f124f16`) |
+| Plugin tests, 7.0-stable-GEOxyz | PostgreSQL 16: minitest 37 runs, 93 assertions, 0 failures; rspec 34 examples, 0 failures. MariaDB 10.11: the same |
+| Plugin tests, 5.1-stable (Ruby 3.2.6, PostgreSQL) | minitest 37 runs, 81 assertions, 0 failures (fewer assertions: the 5.1 branch of the icon test); rspec 34 examples, 0 failures |
+| E2E, 7.0-stable-GEOxyz production mode | PostgreSQL and MariaDB each: smoke 13/0, core 6/0, 6 plugin scenarios with 39 screenshots and 0 problems |
+| OpenAI review | 2 rounds: 2 findings (1 fixed, 1 rejected with evidence), then no findings |
 
 ## Already on this branch
 
-- nothing: the branch equals the branch GEOxyz runs today.
+Base: the branch GEOxyz runs today (`main-GEOxyz` @ 0df9fe4) plus the plan. Code commits of the migration, in order:
+
+| commit | what |
+|---|---|
+| `19da1d5` | tests: drop `require 'minitest/mock'` (Minitest 6 LoadError) |
+| `d3e6af1` | tests: replace the stale `token_limit_parameters` tests by tests of the token limit actually sent |
+| `6024e53` | fix HTTP 500 on every project settings tab (strict locals in `_ai_summary.html.erb`) |
+| `7c2b128` | refuse to generate without an API key, before any issue data is sent |
+| `f46d7ca` | security: `AiSummariesController` checks `@issue.visible?` (private issues leaked their summary, also to anonymous); 404 for an unknown issue |
+| `cb77807` | polling URL through the route helper (sub-URI safe) |
+| `b26627f` | SVG icons through `sprite_icon`, CSS icons kept for 5.1 |
+| `da2363c` | security, combination: summaries follow `redmine_view_issue_description` |
+| `499b5ea` | specs run on Redmine 5.1 again (`fixture_path` fallback) |
+| `f124f16` | the missing-key message translated in all nine locales (OpenAI review finding) |
+
+Every fix has a test that fails without it. E2E scenarios in `test/e2e/` (fake LLM in `test/e2e/support/fake_llm.py`,
+seed in `test/e2e/seed.rb`), evidence in `docs/e2e/` (PostgreSQL), `docs/e2e/mariadb/`, `docs/e2e/baseline-r7/`
+(before the fixes) and `docs/e2e/combination/`; reviews in `docs/reviews/`.
 
 ## Work list for the migration session
 
@@ -35,37 +57,40 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 
 **Priority items**
 
-1. Commit the two fixes from the analysis: drop `<%# locals: (project:) %>` from app/views/projects/settings/_ai_summary.html.erb (HTTP 500 on every project settings page) and the `require 'minitest/mock'` lines in test/test_helper.rb.
-2. Guard SummaryGenerator against an empty API key before anything is sent to the provider.
+1. DONE (`6024e53`, `19da1d5`). Commit the two fixes from the analysis: drop `<%# locals: (project:) %>` from app/views/projects/settings/_ai_summary.html.erb (HTTP 500 on every project settings page) and the `require 'minitest/mock'` lines in test/test_helper.rb.
+2. DONE (`7c2b128`, message translated in `f124f16`). Guard SummaryGenerator against an empty API key before anything is sent to the provider.
 
 **Open items from the analysis** (Dutch; where they conflict with a decision or a priority item above, those win)
 
-3. Commit: drop '<%# locals: (project:) %>' from app/views/projects/settings/_ai_summary.html.erb (HTTP 500 on all project settings when module enabled)
-4. Commit: drop 3x require 'minitest/mock' from test/test_helper.rb (Minitest 6)
-5. Guard blank API key in SummaryGenerator.generate (default endpoint would receive issue data without a key)
-6. Fix stale tests summary_generator_test.rb:193-205 (token_limit_parameters no longer exists)
-7. Icons -> sprite_icon; relative_url_root-safe fetch URL (cosmetic/minor)
+3. DONE (`6024e53`). Commit: drop '<%# locals: (project:) %>' from app/views/projects/settings/_ai_summary.html.erb (HTTP 500 on all project settings when module enabled)
+4. DONE (`19da1d5`). Commit: drop 3x require 'minitest/mock' from test/test_helper.rb (Minitest 6)
+5. DONE (`7c2b128`). Guard blank API key in SummaryGenerator.generate (default endpoint would receive issue data without a key)
+6. DONE (`d3e6af1`). Fix stale tests summary_generator_test.rb:193-205 (token_limit_parameters no longer exists)
+7. DONE (`b26627f`, `cb77807`). Icons -> sprite_icon; relative_url_root-safe fetch URL (cosmetic/minor)
 
 **Checks**
 
-8. Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
-9. Check Redmine 7 webhooks against this plugin (see "Rules"), and note the result here even if nothing is needed.
-10. Verify every feature of the plugin by hand on a running Redmine 7 (screenshots).
+8. DONE (numbers in "Status"). Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
+9. DONE, nothing needed (see "Webhooks"). Check Redmine 7 webhooks against this plugin (see "Rules"), and note the result here even if nothing is needed.
+10. DONE (see "Inventory of functions"). Verify every feature of the plugin by hand on a running Redmine 7 (screenshots).
 
 ## GEOxyz changes to review or re-apply
 
 These GEOxyz commits are on the branch GEOxyz runs today and therefore on this branch. Review each one against the code it now sits on (upstream merges and Redmine 7 core): drop it if upstream or core now does the same, rewrite it if it is not up to the quality rules below (tests, I18n, security, portability), keep it otherwise. Record the verdict per commit in this file.
 
-| commit | date | subject |
-|---|---|---|
-| `0df9fe4` | 2026-02-04 | Initial refactor |
-| `12f2bbf` | 2026-01-30 | GitHub actions and test helpers |
+| commit | date | subject | verdict |
+|---|---|---|---|
+| `0df9fe4` | 2026-02-04 | Initial refactor | KEEP. Project settings, model parameters JSON, subtasks, settings tester are not in upstream or core. Reviewed on Redmine 7: its strict-locals line broke every project settings page (fixed `6024e53`), it left two stale tests (fixed `d3e6af1`) and set `fixture_paths` that 5.1 lacks (fixed `499b5ea`). Authorization (admin or `manage_ai_summary_settings`, module enabled), explicit attribute list instead of mass assignment, masked API key and JSON validation verified in tests and e2e. Left as is: the invalid-JSON flash in the project tab says "Model parameters json is invalid" (attribute name not translated). |
+| `12f2bbf` | 2026-01-30 | GitHub actions and test helpers | KEEP. Workflows `rspec-51.yml`, `rspec-60.yml` are `workflow_dispatch` only (checked). The old `.codex` scripts clone redmine/redmine and know PostgreSQL only; this session set up 7.0-stable-GEOxyz and MariaDB by hand (see "How this session tested"). No 7.0 workflow yet (not required). |
 
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
-- None known. Add here what the session finds.
+- No data fix, no setting change and no new gem. Run `rake redmine:plugins:migrate` as usual (no new migration on this branch).
+- ActiveJob: Redmine 7 production uses Rails' default `:async` adapter (in-process threads); a summary that is being generated when the server restarts stays "generating" until someone regenerates it. Same as before; if that matters, configure a real queue adapter in `config/additional_environment.rb`.
+- The rake tasks `redmine:create_test_data` and `redmine:set_admin_password` are development helpers; do not run them in production (`create_test_data` also fails when the first other active user is not a member of its test project).
+- If `redmine_view_issue_description` is installed: summaries now follow its rule (users without `view_issue_description` no longer get the summary of an issue they cannot open). Intended; nothing to configure.
 
 ## How to test
 
@@ -193,6 +218,66 @@ results quoted in the analysis come from it.
 - No new failure when run together with the other GEOxyz plugins.
 - "After the upgrade" lists every action production needs; "Status" is current.
 
+
+## How this session tested (2026-10-06)
+
+- Redmine `7.0-stable-GEOxyz` (7.0.1, `8067e23`) cloned from jcatrysse/redmine into `redmine/`, Ruby 3.3.6, Rails 8.1.3.1, PostgreSQL 16 and MariaDB 10.11 (`apt-get install mariadb-server`), one checkout with a `database.yml` per engine; the plugin copied into `redmine/plugins/` with rsync. The old `.codex/test_setup.sh` and `redmine_clone.sh` were not used: they clone redmine/redmine and know PostgreSQL only.
+- Redmine `5.1-stable` (jcatrysse) in a second checkout with Ruby 3.2.6 (5.1 refuses Ruby 3.3).
+- E2E: `.codex/start_server.sh` (production mode) and `.codex/e2e.sh`; the plugin talks to `test/e2e/support/fake_llm.py` on 127.0.0.1:4010, so no issue data left the machine. The fake logs every request, which the scenarios use to prove what was and was not sent.
+
+## Baseline (before any change, 7.0-stable-GEOxyz, PostgreSQL and MariaDB)
+
+- minitest: LoadError `minitest/mock`, no test ran; rspec: 0 examples, 11 errors outside of examples (same LoadError). Same on both engines.
+- E2E on the code GEOxyz runs today (`docs/e2e/baseline-r7/`): smoke 13 screenshots, 1 problem (`/projects/e2e-project/settings` HTTP 500); core 6/0.
+
+## Inventory of functions
+
+| function | how a user reaches it | scenario | screenshots |
+|---|---|---|---|
+| Summary block on the issue page (empty state, buttons, icons) | issue page, module `ai_summary` on | `summary_generate.mjs` | `summary_generate-manager-empty`, `-reporter-no-block`, `-module-disabled` |
+| Generate summary | "Generate Summary" (confirm), `generate_issue_summary` | `summary_generate.mjs` | `-manager-generating`, `-manager-generated` |
+| Generate with subtasks; subtask depth 0 hides it | "Generate Summary (with subtasks)", `generate_issue_summary_with_subtasks` | `summary_generate.mjs` | `-manager-with-subtasks`, `-manager-depth-zero` |
+| View summary (public permission `view_issue_summary`) | issue page; `GET /issues/:id/ai_summaries/content` (polling) | `summary_generate.mjs` | `-reporter-view-only`, `-anonymous-public-issue` |
+| Refusals: reporter create/delete, private issue, private project, module off | API requests and pages | `summary_generate.mjs` | `-reporter-private-issue`, `-outsider-private-project`, `-module-disabled` |
+| Quote summary into a note | "Quote Summary" | `summary_actions.mjs` | `summary_actions-quoted` |
+| Copy summary | "Copy Summary" (clipboard) | `summary_actions.mjs` | `summary_actions-copied` |
+| Stale on issue change, regenerate | any issue save; "Regenerate" | `summary_actions.mjs` | `summary_actions-stale`, `-regenerated` |
+| Delete summary | "Reset Summary" (confirm), `destroy_issue_summary` | `summary_actions.mjs` | `summary_actions-deleted` |
+| Failure: no API key (nothing sent), refused key, empty content, unreachable endpoint; copy error | error marker | `summary_failures.mjs` | `summary_failures-no-api-key`, `-error-copied`, `-wrong-key`, `-empty-content`, `-unreachable` |
+| Debug logging (payload kept with the summary) | plugin setting | `summary_failures.mjs` | `summary_failures-debug-logging` |
+| Automatic generation on notes; "only if a summary exists" | plugin/project setting, adding a note | `auto_generate.mjs` | `auto_generate-off`, `-requires-existing`, `-on`, `-requires-existing-with-summary` |
+| Plugin settings (admin): form, masked key kept, invalid JSON refused | Administration, Plugins, Configure | `plugin_settings.mjs` | `plugin_settings-form`, `-saved`, `-invalid-json` |
+| Test connection, list models; without key | buttons on the plugin settings | `plugin_settings.mjs` | `plugin_settings-api-tools`, `-test-no-key` |
+| Non-admin refused (page and `/ai_summary_settings/models`) | | `plugin_settings.mjs` | `plugin_settings-manager-refused` |
+| Project settings tab (`manage_ai_summary_settings`): all tabs render, overrides saved and used, masked key, invalid JSON, inherit | project, Settings, AI Summary | `project_settings.mjs` | `project_settings-tab`, `-saved`, `-override-used`, `-invalid-json`, `-inherit` |
+| Project settings refused to reporter (PUT 403) and outsider | | `project_settings.mjs` | `project_settings-reporter`, `-outsider` |
+| Combination with `redmine_view_issue_description` | content endpoint as a user without `view_issue_description` | `combination/view_issue_description.mjs` (runs only when that plugin is installed) | `docs/e2e/combination/*-before-*` (leak), `*-after-*` (403) |
+| Rake `redmine:create_test_data`, `redmine:set_admin_password` | command line | run by hand on the e2e instance | none: `set_admin_password` works and logs the admin with the password hash filtered; `create_test_data` fails at its second update (`Assignee is invalid`) when the first other active user is no member of its project (pre-existing, dev helper) |
+
+Every screenshot was opened and looked at; captions say what each proves. Where a picture cannot show something (a tooltip, a request that was not sent), the scenario asserts it and the caption says so.
+
+## Webhooks
+
+Redmine 7 webhooks send core's `issues/show.api.rsb` payload. This plugin adds nothing to the issue API, does not hide issue data and changes no issue attribute (marking a summary stale writes only `issue_summaries`), so webhook payloads are consistent with the UI. Nothing to do.
+
+## Together with other GEOxyz plugins
+
+- Not run with all GEOxyz plugins (the coordinator's harness does that). Targeted check with `redmine_view_issue_description` (main @ e289ec6), the plugin that restricts issue access: it gates `IssuesController#show/edit/update`, not `Issue#visible?`, so `GET /issues/:id/ai_summaries/content` returned the summary to a member without `view_issue_description` (HTTP 200, measured). Fixed in `da2363c` (duck-typed, no effect without that plugin); after: 403. The plugin's tests are green with and without that plugin installed. Core's own e2e step "issue as reporter" answers 403 with it installed, by that plugin's design.
+- `ProjectsHelperPatch` uses `alias_method` on `project_settings_tabs`; a plugin that `prepend`s the same method would recurse. None found in the plugins checked; left as is.
+
+## Found, not fixed (outside this migration's scope)
+
+- Private notes and subtasks: the issue data sent to the provider includes all journals, private notes included, and all subtasks; the resulting summary is shown to everyone who may view the summary. See "Open questions for Jan".
+- `config/routes.rb` redeclares `resources :issues` and `resources :projects` without `only: []`, duplicating core routes at the end of the table (harmless, core wins).
+- Project tab: the invalid-JSON flash shows "Model parameters json is invalid" (no attribute translation); the project module shows as "Ai summary" in the modules list (no `project_module_ai_summary` key); the select option "inherit" shows as "Default" (`label_inherit` missing).
+- `SettingsTester` returns its messages in English only ("API key is missing", "Models fetched.").
+- Anonymous users see "Quote Summary" though they cannot add a note (the link does nothing).
+- `ruby-openai` is unpinned (resolves to 8.3.0; works, verified against the fake endpoint).
+
+## Open questions for Jan
+
+1. **Private notes and private subtasks in summaries.** Today (upstream behaviour, unchanged) the summary is built from every journal, private notes included, and every subtask, and shown to everyone with the public `view_issue_summary` permission who may see the issue. A member without `view_private_notes` can thus read a summary of private notes. Options: (a) leave as is; (b) leave private notes and private subtasks out of the data sent; (c) show the summary only to users with `view_private_notes` when the issue has private notes. Recommendation: (b), it also sends less to the provider. Not built: it changes what summaries contain, which users may rely on.
+2. **`redmine_view_issue_description` coupling.** `da2363c` mirrors that plugin's access rule (admin, assignee, watcher access, `description_access_granted?`). Cleaner long term: that plugin exposes one method (or patches `Issue#visible?` for the detail view) that other plugins call. Recommendation: keep `da2363c` now; ask the owner of that plugin for a single public check.
 
 ## Analysis report (2026-10-06, Dutch)
 
