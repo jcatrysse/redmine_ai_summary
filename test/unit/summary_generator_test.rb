@@ -190,18 +190,32 @@ class SummaryGeneratorTest < ActiveSupport::TestCase
     assert_equal 1, subtasks.first[:depth]
   end
 
-  def test_token_limit_parameters_uses_completion_tokens_for_openai
-    Setting.stubs(:plugin_redmine_ai_summary).returns({ 'api_endpoint' => 'https://api.openai.com/v1', 'max_completion_tokens' => 123 })
-    params = RedmineAiSummary::SummaryGenerator.send(:token_limit_parameters)
+  # The token limit used to be chosen per endpoint (token_limit_parameters); since the
+  # model parameters refactor it comes from SettingsResolver.model_parameters, for every
+  # endpoint alike. These tests check what is actually sent to the provider.
+  def test_token_limit_falls_back_to_max_completion_tokens_for_every_endpoint
+    ['https://api.openai.com/v1', 'https://api.groq.com/openai/v1'].each do |endpoint|
+      Setting.stubs(:plugin_redmine_ai_summary).returns(
+        { 'api_endpoint' => endpoint, 'api_key' => 'key', 'model_parameters_json' => '', 'max_completion_tokens' => 123 }
+      )
 
-    assert_equal({ max_completion_tokens: 123 }, params)
+      parameters = chat_parameters_sent_by_generate
+
+      assert_equal 123, parameters[:max_completion_tokens], endpoint
+      refute parameters.key?(:max_tokens), endpoint
+    end
   end
 
-  def test_token_limit_parameters_uses_max_tokens_for_other_endpoints
-    Setting.stubs(:plugin_redmine_ai_summary).returns({ 'api_endpoint' => 'https://api.groq.com/openai/v1', 'max_completion_tokens' => 321 })
-    params = RedmineAiSummary::SummaryGenerator.send(:token_limit_parameters)
+  def test_token_limit_uses_max_tokens_from_model_parameters_json
+    Setting.stubs(:plugin_redmine_ai_summary).returns(
+      { 'api_endpoint' => 'https://api.groq.com/openai/v1', 'api_key' => 'key',
+        'model_parameters_json' => '{"max_tokens":321}', 'max_completion_tokens' => 2000 }
+    )
 
-    assert_equal({ max_tokens: 321 }, params)
+    parameters = chat_parameters_sent_by_generate
+
+    assert_equal 321, parameters[:max_tokens]
+    refute parameters.key?(:max_completion_tokens)
   end
 
   def test_generate_returns_false_when_client_initialization_fails
@@ -249,5 +263,24 @@ class SummaryGeneratorTest < ActiveSupport::TestCase
     assert_equal false, success
     assert_nil summary
     assert error_message.present?
+  end
+
+  private
+
+  def chat_parameters_sent_by_generate
+    issue = FakeIssue.new(id: 1, subject: 'Main', description: 'Main description', journals: [])
+    user = Struct.new(:id).new(1)
+    fake_client = Object.new
+    def fake_client.chat(parameters:)
+      @parameters = parameters
+      { "choices" => [{ "message" => { "content" => "" } }] }
+    end
+    def fake_client.parameters
+      @parameters
+    end
+    RedmineAiSummary::SummaryGenerator.stubs(:initialize_openai_client).returns(fake_client)
+
+    RedmineAiSummary::SummaryGenerator.generate(issue, user)
+    fake_client.parameters
   end
 end
