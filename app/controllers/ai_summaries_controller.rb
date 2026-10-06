@@ -42,6 +42,9 @@ class AiSummariesController < ApplicationController
 
   def find_issue
     @issue = Issue.find(params[:issue_id])
+    render_403 unless @issue.visible?
+  rescue ActiveRecord::RecordNotFound
+    render_404
   end
 
   def check_view_permission
