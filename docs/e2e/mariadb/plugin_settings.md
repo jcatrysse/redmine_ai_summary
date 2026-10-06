@@ -1,6 +1,6 @@
 # plugin_settings
 
-Run 2026-10-06T20:09:08.898Z against http://127.0.0.1:3000.
+Run 2026-10-06T20:43:14.126Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|
