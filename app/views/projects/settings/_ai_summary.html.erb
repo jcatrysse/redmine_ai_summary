@@ -1,4 +1,3 @@
-<%# locals: (project:) %>
 <% plugin_settings = Setting.plugin_redmine_ai_summary %>
 <% sentinel = RedmineAiSummary::Constants::API_KEY_SENTINEL %>
 <% auto_generate_value = RedmineAiSummary::SettingsResolver.project_setting_value(@project, :auto_generate) %>
