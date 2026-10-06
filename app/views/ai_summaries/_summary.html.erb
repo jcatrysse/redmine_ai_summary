@@ -24,7 +24,6 @@
   <script>
     (function() {
       var container = document.getElementById('issue-summary-container');
-      var issueId = <%= @issue.id %>;
       var pollingInterval;
 
       window.startSummaryPolling = function() {
@@ -62,7 +61,7 @@
 
         var wasGenerating = issueSummary.dataset.status === 'generating';
 
-        fetch('/issues/' + issueId + '/ai_summaries/content')
+        fetch('<%= j content_issue_ai_summaries_path(@issue) %>')
           .then(function(response) { return response.text(); })
           .then(function(html) {
             var tempDiv = document.createElement('div');
