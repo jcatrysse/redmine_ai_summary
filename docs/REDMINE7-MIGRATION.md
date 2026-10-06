@@ -23,7 +23,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 2 |
 | Measured on | Redmine 7.0.1 (7.0-stable-GEOxyz + latest 7.0-stable), Rails 8.1.3.1, Ruby 3.3.6, PostgreSQL 16 and MariaDB 10.11 |
-| Branch head when this file was written | `4e5ba95` |
+| Branch head when this file was written | `8ebb268` |
 
 ## Already on this branch
 
@@ -38,7 +38,7 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 1. Commit the two fixes from the analysis: drop `<%# locals: (project:) %>` from app/views/projects/settings/_ai_summary.html.erb (HTTP 500 on every project settings page) and the `require 'minitest/mock'` lines in test/test_helper.rb.
 2. Guard SummaryGenerator against an empty API key before anything is sent to the provider.
 
-**Open items from the analysis** (Dutch; where they repeat a priority item, the priority item wins)
+**Open items from the analysis** (Dutch; where they conflict with a decision or a priority item above, those win)
 
 3. Commit: drop '<%# locals: (project:) %>' from app/views/projects/settings/_ai_summary.html.erb (HTTP 500 on all project settings when module enabled)
 4. Commit: drop 3x require 'minitest/mock' from test/test_helper.rb (Minitest 6)
@@ -174,7 +174,9 @@ results quoted in the analysis come from it.
 - **5.1 compatibility**: prefer fixes that also run on Redmine 5.1 so they can be merged early;
   say so when a fix cannot.
 - **Git**: work on `redmine70-migration` only; never push to the default branch; never force-push
-  a branch someone else uses. Descriptive commit messages (what and why).
+  a branch someone else uses. Descriptive commit messages (what and why). Push after every
+  commit, together with the updated status in this file: a cloud session can stop at a usage
+  limit, and work that is not pushed is lost with its container.
 - **GitHub Actions**: manual only (`workflow_dispatch`). Do not add push, pull_request or schedule
   triggers.
 
