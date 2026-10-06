@@ -3,6 +3,9 @@ module RedmineAiSummary
     def self.generate(issue, user, subtask_max_depth: nil)
       begin
         project = issue.respond_to?(:project) ? issue.project : nil
+        # Without a key the provider refuses anyway; do not send it the issue first.
+        return [false, nil, 'API key is missing'] if RedmineAiSummary::SettingsResolver.api_key(project).blank?
+
         client = initialize_openai_client(project)
 
         issue_data = issue_data_for(issue, subtask_max_depth: subtask_max_depth)

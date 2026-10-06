@@ -57,4 +57,17 @@ RSpec.describe RedmineAiSummary::SummaryGenerator do
 
     described_class.generate(issue, user)
   end
+
+  it 'refuses without an API key before any issue data is sent' do
+    allow(RedmineAiSummary::SettingsResolver).to receive(:api_key).and_return('  ')
+    expect(OpenAI::Client).not_to receive(:new)
+    expect(described_class).not_to receive(:issue_data_for)
+
+    success, summary, error = described_class.generate(issue, user)
+
+    expect(success).to be(false)
+    expect(summary).to be_nil
+    expect(error).to eq('API key is missing')
+    expect(IssueSummary.find_by(issue_id: issue.id)).to be_nil
+  end
 end

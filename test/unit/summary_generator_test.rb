@@ -219,6 +219,7 @@ class SummaryGeneratorTest < ActiveSupport::TestCase
   end
 
   def test_generate_returns_false_when_client_initialization_fails
+    RedmineAiSummary::SettingsResolver.stubs(:api_key).returns('key')
     issue = Struct.new(:id).new(1)
     user = Struct.new(:id).new(1)
 
@@ -231,6 +232,7 @@ class SummaryGeneratorTest < ActiveSupport::TestCase
   end
 
   def test_generate_returns_false_when_issue_data_build_fails
+    RedmineAiSummary::SettingsResolver.stubs(:api_key).returns('key')
     issue = Struct.new(:id).new(1)
     user = Struct.new(:id).new(1)
     fake_client = Struct.new(:chat).new({})
@@ -245,6 +247,7 @@ class SummaryGeneratorTest < ActiveSupport::TestCase
   end
 
   def test_generate_returns_false_when_content_empty
+    RedmineAiSummary::SettingsResolver.stubs(:api_key).returns('key')
     issue = FakeIssue.new(id: 1, subject: 'Main', description: 'Main description', journals: [])
     user = Struct.new(:id).new(1)
     fake_client = Object.new
