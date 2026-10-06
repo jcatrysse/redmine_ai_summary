@@ -58,6 +58,7 @@ tr:
       no_models_available: "Kullanılabilir model yok."
       api_test_failed: "API testi başarısız oldu."
       api_models_failed: "Modeller alınamadı."
+      api_key_missing: "API Anahtarı eksik."
     notices:
       summary_generated: "Özet oluşturuldu."
       summary_failed: "Özet oluşturulurken bir hata oluştu."

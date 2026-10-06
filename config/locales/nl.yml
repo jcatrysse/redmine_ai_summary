@@ -58,6 +58,7 @@ nl:
       no_models_available: "Geen modellen beschikbaar."
       api_test_failed: "API-test is mislukt."
       api_models_failed: "Modellen ophalen is mislukt."
+      api_key_missing: "API-sleutel ontbreekt."
     notices:
       summary_generated: "Samenvatting is gegenereerd."
       summary_failed: "Er is een fout opgetreden tijdens het genereren van de samenvatting."

@@ -58,6 +58,7 @@ fr:
       no_models_available: "Aucun modèle disponible."
       api_test_failed: "Le test de l’API a échoué."
       api_models_failed: "Impossible de récupérer les modèles."
+      api_key_missing: "Clé API manquante."
     notices:
       summary_generated: "Le résumé a été généré."
       summary_failed: "Une erreur s’est produite lors de la génération du résumé."

@@ -58,6 +58,7 @@ de:
       no_models_available: "Keine Modelle verfügbar."
       api_test_failed: "API-Test fehlgeschlagen."
       api_models_failed: "Modelle konnten nicht geladen werden."
+      api_key_missing: "API-Schlüssel fehlt."
     notices:
       summary_generated: "Zusammenfassung wurde generiert."
       summary_failed: "Beim Generieren der Zusammenfassung ist ein Fehler aufgetreten."

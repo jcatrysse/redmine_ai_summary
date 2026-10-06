@@ -58,6 +58,7 @@ en:
       no_models_available: "No models available."
       api_test_failed: "API test failed."
       api_models_failed: "Failed to fetch models."
+      api_key_missing: "API key is missing."
     notices:
       summary_generated: "Summary is generated."
       summary_failed: "An error occurred while generating the summary."

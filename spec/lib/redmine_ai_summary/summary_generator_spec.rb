@@ -67,7 +67,16 @@ RSpec.describe RedmineAiSummary::SummaryGenerator do
 
     expect(success).to be(false)
     expect(summary).to be_nil
-    expect(error).to eq('API key is missing')
+    expect(error).to eq('API key is missing.')
     expect(IssueSummary.find_by(issue_id: issue.id)).to be_nil
+  end
+
+  it 'gives the missing key message in the default language' do
+    allow(RedmineAiSummary::SettingsResolver).to receive(:api_key).and_return(nil)
+    allow(Setting).to receive(:default_language).and_return('de')
+
+    _success, _summary, error = described_class.generate(issue, user)
+
+    expect(error).to eq('API-Schlüssel fehlt.')
   end
 end

@@ -58,6 +58,7 @@ pl:
       no_models_available: "Brak dostępnych modeli."
       api_test_failed: "Test API nie powiódł się."
       api_models_failed: "Nie udało się pobrać modeli."
+      api_key_missing: "Brak klucza API."
     notices:
       summary_generated: "Podsumowanie zostało wygenerowane."
       summary_failed: "Wystąpił błąd podczas generowania podsumowania."

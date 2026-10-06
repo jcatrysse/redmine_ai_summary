@@ -58,6 +58,7 @@ pt:
       no_models_available: "Nenhum modelo disponível."
       api_test_failed: "O teste da API falhou."
       api_models_failed: "Não foi possível obter os modelos."
+      api_key_missing: "Chave da API ausente."
     notices:
       summary_generated: "O resumo foi gerado."
       summary_failed: "Ocorreu um erro ao gerar o resumo."

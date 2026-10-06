@@ -33,17 +33,17 @@ ai.pluginSettings({ api_key: '' });
 let mark = ai.llmMark();
 let status = await generateAndWait('stale');
 assert(status === 'stale', `no key -> stale (got ${status})`);
-assert(await errorOf() === 'API key is missing', `no key error: ${await errorOf()}`);
+assert(await errorOf() === 'API key is missing.', `no key error: ${await errorOf()}`);
 assert(ai.llmRequests(mark).length === 0, `no request reached the provider without a key (${ai.llmRequests(mark).length})`);
 assert(await t.page.locator('#issue-summary [data-action=copy_error] svg use').count() === 1, 'error marker has the warning icon');
 await t.page.locator('#issue-summary [data-action=copy_error]').hover();
-await t.shot('no-api-key', 'No API key: the failed state and the warning marker; its message (checked, not visible in the picture) is "API key is missing", and the fake provider received no request');
+await t.shot('no-api-key', 'No API key: the failed state and the warning marker; its message (checked, not visible in the picture) is "API key is missing.", and the fake provider received no request');
 
 // the error marker copies the message
 await t.page.locator('#issue-summary [data-action=copy_error]').click();
 await t.page.waitForTimeout(300);
 const clip = await t.page.evaluate(() => navigator.clipboard.readText());
-assert(clip === 'API key is missing', `error copied: ${clip}`);
+assert(clip === 'API key is missing.', `error copied: ${clip}`);
 await t.shot('error-copied', 'Clicking the warning marker copies the error message and shows a notice');
 
 // a key the provider refuses

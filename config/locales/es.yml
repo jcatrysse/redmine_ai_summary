@@ -58,6 +58,7 @@ es:
       no_models_available: "No hay modelos disponibles."
       api_test_failed: "La prueba de la API falló."
       api_models_failed: "No se pudieron obtener los modelos."
+      api_key_missing: "Falta la clave API."
     notices:
       summary_generated: "El resumen se generó."
       summary_failed: "Ocurrió un error al generar el resumen."

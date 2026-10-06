@@ -4,7 +4,11 @@ module RedmineAiSummary
       begin
         project = issue.respond_to?(:project) ? issue.project : nil
         # Without a key the provider refuses anyway; do not send it the issue first.
-        return [false, nil, 'API key is missing'] if RedmineAiSummary::SettingsResolver.api_key(project).blank?
+        if RedmineAiSummary::SettingsResolver.api_key(project).blank?
+          # Stored with the summary and shown to everyone, so in the instance's language.
+          return [false, nil, ::I18n.t('redmine_ai_summary.text.api_key_missing', locale: Setting.default_language,
+                                                                                   default: 'API key is missing.')]
+        end
 
         client = initialize_openai_client(project)
 
