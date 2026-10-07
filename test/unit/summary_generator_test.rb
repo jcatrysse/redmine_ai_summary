@@ -151,6 +151,46 @@ class SummaryGeneratorTest < ActiveSupport::TestCase
     assert_equal 'relates', data[:notes].first[:details].first[:prop_key]
   end
 
+  # Decision Jan 2026-10-07 (q1, option B): private notes and private subtasks
+  # are not sent; the summary is shown to users who may not see them.
+  PrivateNotesJournal = Struct.new(:id, :user, :notes, :created_on, :details, :private_notes)
+
+  class PrivateFakeIssue < FakeIssue
+    attr_reader :is_private
+
+    def initialize(is_private: false, **args)
+      super(**args)
+      @is_private = is_private
+    end
+  end
+
+  def test_issue_data_for_leaves_out_private_notes
+    user = FakeJournalUser.new('alice')
+    journals = [
+      PrivateNotesJournal.new(1, user, 'public note', Time.utc(2024, 1, 1), [], false),
+      PrivateNotesJournal.new(2, user, 'private note', Time.utc(2024, 1, 2), [FakeDetail.new('attr', 'done_ratio', '0', '50')], true)
+    ]
+    issue = FakeIssue.new(id: 1, subject: 'Main', description: 'Main description', journals: journals)
+
+    RedmineAiSummary::SettingsResolver.stubs(:include_journal_changes?).returns(true)
+    data = RedmineAiSummary::SummaryGenerator.send(:issue_data_for, issue, subtask_max_depth: 0)
+
+    assert_equal [1], data[:notes].map { |note| note[:id] }
+    refute_includes data.to_json, 'private note'
+  end
+
+  def test_subtasks_for_leaves_out_private_subtasks_and_what_hangs_below_them
+    below_private = PrivateFakeIssue.new(id: 4, subject: 'Below private', description: 'd')
+    private_child = PrivateFakeIssue.new(id: 3, subject: 'Private child', description: 'secret', is_private: true,
+                                         children: [below_private])
+    public_child = PrivateFakeIssue.new(id: 2, subject: 'Public child', description: 'd')
+    issue = PrivateFakeIssue.new(id: 1, subject: 'Main', description: 'd', children: [public_child, private_child])
+
+    subtasks = RedmineAiSummary::SummaryGenerator.send(:subtasks_for, issue, 3)
+
+    assert_equal ['Public child'], subtasks.map { |subtask| subtask[:subject] }
+  end
+
   def test_project_subtask_depth_override_returns_nil_when_table_missing
     project = Struct.new(:id).new(1)
 

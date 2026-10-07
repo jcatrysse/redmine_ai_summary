@@ -94,7 +94,8 @@ module RedmineAiSummary
             committed_on: changeset.committed_on
           }
         end,
-        notes: issue.journals.map do |journal|
+        # Private notes stay out: the summary is shown to users who may not see them.
+        notes: issue.journals.reject { |journal| journal.try(:private_notes) }.map do |journal|
           entry = {
             id: journal.id,
             user: journal.user.login,
@@ -186,6 +187,9 @@ module RedmineAiSummary
 
       while (entry = queue.shift)
         subtask, depth = entry
+        # Private subtasks (and what hangs below them) stay out, like private notes.
+        next if subtask.try(:is_private)
+
         results << {
           id: subtask.id,
           subject: subtask.subject,
