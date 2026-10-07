@@ -25,10 +25,11 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Measured on | Redmine 7.0.1 (7.0-stable-GEOxyz + latest 7.0-stable), Rails 8.1.3.1, Ruby 3.3.6, PostgreSQL 16 and MariaDB 10.11 |
 | Branch head when this file was written | `8ebb268` |
 | Migration done on | 2026-10-06, branch head after the work: see `git log` (last code change `f124f16`) |
-| Plugin tests, 7.0-stable-GEOxyz | PostgreSQL 16: minitest 37 runs, 93 assertions, 0 failures; rspec 34 examples, 0 failures. MariaDB 10.11: the same |
-| Plugin tests, 5.1-stable (Ruby 3.2.6, PostgreSQL) | minitest 37 runs, 81 assertions, 0 failures (fewer assertions: the 5.1 branch of the icon test); rspec 34 examples, 0 failures |
-| E2E, 7.0-stable-GEOxyz production mode | PostgreSQL and MariaDB each: smoke 13/0, core 6/0, 6 plugin scenarios with 39 screenshots and 0 problems |
-| OpenAI review | 2 rounds: 2 findings (1 fixed, 1 rejected with evidence), then no findings |
+| Plugin tests, 7.0-stable-GEOxyz (2026-10-07, after Jan's decisions) | PostgreSQL 16, plugin alone: minitest 41 runs, 103 assertions, 0 failures; rspec 34 examples, 0 failures. With 34 other GEOxyz plugins installed: the same (41/0, 34/0) |
+| Plugin tests, 2026-10-06 (before the decisions) | PostgreSQL 16 and MariaDB 10.11: minitest 37 runs, 0 failures; rspec 34 examples, 0 failures. MariaDB is no longer required (Jan, 2026-10-07) |
+| Plugin tests, 5.1-stable (2026-10-06 only; 5.1 no longer a target) | minitest 37 runs, 81 assertions, 0 failures (fewer assertions: the 5.1 branch of the icon test); rspec 34 examples, 0 failures |
+| E2E, 7.0-stable-GEOxyz production mode, PostgreSQL (2026-10-07) | plugin alone: smoke 13/0, core 6/0, 7 plugin scenarios with 44 screenshots and 0 problems; with 32 other GEOxyz plugins: `combination/geoxyz_plugins.mjs` 8 screenshots, 0 problems |
+| OpenAI review | 2026-10-06: 2 findings (1 fixed, 1 rejected with evidence), then no findings. 2026-10-07: 2 findings, both rejected with evidence |
 
 ## Already on this branch
 
@@ -46,6 +47,9 @@ Base: the branch GEOxyz runs today (`main-GEOxyz` @ 0df9fe4) plus the plan. Code
 | `da2363c` | security, combination: summaries follow `redmine_view_issue_description` |
 | `499b5ea` | specs run on Redmine 5.1 again (`fixture_path` fallback) |
 | `f124f16` | the missing-key message translated in all nine locales (OpenAI review finding) |
+| `6c8b3e8` | decision q1: private notes and private subtasks are not sent to the provider |
+| `4193d80` | general decision: `project_settings_tabs` patched with `prepend` instead of `alias_method` |
+| `a98fefa` | general decision: the 5.1-only code paths of `b26627f` and `499b5ea` removed again |
 
 Every fix has a test that fails without it. E2E scenarios in `test/e2e/` (fake LLM in `test/e2e/support/fake_llm.py`,
 seed in `test/e2e/seed.rb`), evidence in `docs/e2e/` (PostgreSQL), `docs/e2e/mariadb/`, `docs/e2e/baseline-r7/`
@@ -68,9 +72,16 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 6. DONE (`d3e6af1`). Fix stale tests summary_generator_test.rb:193-205 (token_limit_parameters no longer exists)
 7. DONE (`b26627f`, `cb77807`). Icons -> sprite_icon; relative_url_root-safe fetch URL (cosmetic/minor)
 
+**Decisions by Jan, 2026-10-07** (see "Decided by Jan")
+
+11. DONE (`6c8b3e8`, e2e `private_data.mjs`). Leave private notes and private subtasks out of the data sent.
+12. DONE (`4193d80`, e2e `combination/geoxyz_plugins.mjs`). Patch `project_settings_tabs` with `prepend`.
+13. DONE (`a98fefa`). Remove the 5.1-only code paths; tests and e2e on PostgreSQL only.
+14. Nothing to build: q2 (keep `da2363c`), recorded only.
+
 **Checks**
 
-8. DONE (numbers in "Status"). Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
+8. DONE (numbers in "Status"; MariaDB and 5.1 runs of 2026-10-06 kept as history, no longer required). Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
 9. DONE, nothing needed (see "Webhooks"). Check Redmine 7 webhooks against this plugin (see "Rules"), and note the result here even if nothing is needed.
 10. DONE (see "Inventory of functions"). Verify every feature of the plugin by hand on a running Redmine 7 (screenshots).
 
@@ -87,6 +98,7 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
+- Summaries generated after the upgrade no longer contain private notes or private subtasks (decision q1). Existing summaries keep their text until they are regenerated; regenerate the ones that matter if old summaries may hold private information.
 - No data fix, no setting change and no new gem. Run `rake redmine:plugins:migrate` as usual (no new migration on this branch).
 - ActiveJob: Redmine 7 production uses Rails' default `:async` adapter (in-process threads); a summary that is being generated when the server restarts stays "generating" until someone regenerates it. Same as before; if that matters, configure a real queue adapter in `config/additional_environment.rb`.
 - The rake tasks `redmine:create_test_data` and `redmine:set_admin_password` are development helpers; do not run them in production (`create_test_data` also fails when the first other active user is not a member of its test project).
@@ -130,9 +142,8 @@ results quoted in the analysis come from it.
 4. **GEOxyz changes**: go through the table above, one item at a time. Each kept or re-made change
    is its own commit with a test that proves it. Record the verdict in the table.
 5. **Work list**: then the numbered list, in order. One concern per commit.
-6. **Portability**: everything must run on Redmine's supported databases (PostgreSQL,
-   MySQL/MariaDB; SQLite where the plugin already supports it). Migrations must be reversible and
-   are run down and up on PostgreSQL and MariaDB.
+6. **Portability**: PostgreSQL 16 is what runs (Jan, 2026-10-07); keep SQL portable where that
+   costs nothing. Migrations must be reversible and are run down and up on PostgreSQL.
 7. **Together**: run with the other GEOxyz plugins installed (the migration kit's harness, or
    `RMP_EXTRA_PLUGINS`). A failure that only appears in combination is a finding to record here.
 8. **End to end, visually, every function**: on the real Redmine from `start_server.sh`
@@ -149,9 +160,8 @@ results quoted in the analysis come from it.
    - Functions without a page (mail in and out, REST API, rake tasks, cron, webhooks): exercise
      them against the same running instance (mails land in `redmine/tmp/mails`, `t.mails()`
      reads them; API through `t.page.request`) and record command and result.
-   - Before pictures where behaviour or layout changes: the branch GEOxyz runs today, on
-     Redmine 5.1, same scenarios, `RMP_E2E_OUT=docs/e2e/before`.
-   - Run the whole e2e set once on MariaDB as well (`RMP_DB=mariadb`, then `start_server.sh --reset`).
+   - Before pictures where behaviour or layout changes: the code before the change on Redmine 7
+     (`docs/e2e/baseline-r7/`). No MariaDB run required any more (Jan, 2026-10-07).
 9. **Independent review**: first your own, adversarial: re-read the whole diff as if someone
    else wrote it and you are paid to reject it. Then, **when `OPENAI_API_KEY` is set in the
    session**, `./.codex/openai_review.sh`: it sends the diff of this branch to an OpenAI model
@@ -196,8 +206,10 @@ results quoted in the analysis come from it.
   (on by default: `t.sudo()` in a scenario). The breaker list is in the migration kit's CHECKLIST.md.
 - **Locales**: keep the locales the plugin ships in sync; translate a new key by matching the
   closest existing key in the same file, not from scratch; do not add new languages.
-- **5.1 compatibility**: prefer fixes that also run on Redmine 5.1 so they can be merged early;
-  say so when a fix cannot.
+- **Redmine 7 only** (Jan, 2026-10-07): GEOxyz goes straight to Redmine 7, no backports to 5.1, nothing cherry-picked to the default branch or the branch production runs today; `redmine70-migration` goes live with Redmine 7. No code paths that exist only for 5.1.
+- **PostgreSQL only** (Jan, 2026-10-07): production runs PostgreSQL 16; tests and e2e run on PostgreSQL. Keep SQL portable where that costs nothing; a MariaDB-only problem is a note, not a blocker.
+- **prepend, not alias_method** (Jan, 2026-10-07): a core method that other plugins also patch is patched with `prepend`.
+- **deface** (Jan, 2026-10-07): a plugin that depends on deface requires it without a version constraint (this plugin does not use deface).
 - **Git**: work on `redmine70-migration` only; never push to the default branch; never force-push
   a branch someone else uses. Descriptive commit messages (what and why). Push after every
   commit, together with the updated status in this file: a cloud session can stop at a usage
@@ -208,7 +220,7 @@ results quoted in the analysis come from it.
 ## Definition of done
 
 - All items of the work list are done or explicitly deferred with a reason, in this file.
-- The plugin's tests are green on Redmine 7.0-stable-GEOxyz with PostgreSQL and MariaDB
+- The plugin's tests are green on Redmine 7.0-stable-GEOxyz with PostgreSQL
   (numbers in this file); boot, production-like eager load, migrations up/down OK.
 - Every function in the inventory exercised end to end on a real running Redmine, with and
   without permissions and on its failure paths; `./.codex/e2e.sh` green; screenshots looked at,
@@ -252,6 +264,8 @@ results quoted in the analysis come from it.
 | Project settings tab (`manage_ai_summary_settings`): all tabs render, overrides saved and used, masked key, invalid JSON, inherit | project, Settings, AI Summary | `project_settings.mjs` | `project_settings-tab`, `-saved`, `-override-used`, `-invalid-json`, `-inherit` |
 | Project settings refused to reporter (PUT 403) and outsider | | `project_settings.mjs` | `project_settings-reporter`, `-outsider` |
 | Combination with `redmine_view_issue_description` | content endpoint as a user without `view_issue_description` | `combination/view_issue_description.mjs` (runs only when that plugin is installed) | `docs/e2e/combination/*-before-*` (leak), `*-after-*` (403) |
+| Private notes and private subtasks not sent (decision q1) | generate (with subtasks) on an issue with private data | `private_data.mjs` | `private_data-manager`, `-admin`, `-reporter`, `-outsider`, `-outsider-private-subtask` |
+| Project settings tab with the other GEOxyz plugins (prepend) | project, Settings, AI Summary; issue list; issue page | `combination/geoxyz_plugins.mjs` (`RMP_COMBINATION=1`) | `docs/e2e/combination/combination_geoxyz_plugins-32-plugins-*` (8) |
 | Rake `redmine:create_test_data`, `redmine:set_admin_password` | command line | run by hand on the e2e instance | none: `set_admin_password` works and logs the admin with the password hash filtered; `create_test_data` fails at its second update (`Assignee is invalid`) when the first other active user is no member of its project (pre-existing, dev helper) |
 
 Every screenshot was opened and looked at; captions say what each proves. Where a picture cannot show something (a tooltip, a request that was not sent), the scenario asserts it and the caption says so.
@@ -263,11 +277,13 @@ Redmine 7 webhooks send core's `issues/show.api.rsb` payload. This plugin adds n
 ## Together with other GEOxyz plugins
 
 - Not run with all GEOxyz plugins (the coordinator's harness does that). Targeted check with `redmine_view_issue_description` (main @ e289ec6), the plugin that restricts issue access: it gates `IssuesController#show/edit/update`, not `Issue#visible?`, so `GET /issues/:id/ai_summaries/content` returned the summary to a member without `view_issue_description` (HTTP 200, measured). Fixed in `da2363c` (duck-typed, no effect without that plugin); after: 403. The plugin's tests are green with and without that plugin installed. Core's own e2e step "issue as reporter" answers 403 with it installed, by that plugin's design.
-- `ProjectsHelperPatch` uses `alias_method` on `project_settings_tabs`; a plugin that `prepend`s the same method would recurse. None found in the plugins checked; left as is.
+- 2026-10-07, all GEOxyz plugins with a `redmine70-migration` branch (38: 30 public, 8 private; the 7 without that branch left out): with this plugin's old `alias_method` patch, Project > Settings failed (`super: no superclass method 'project_settings_tabs'`, measured); with `prepend` (`4193d80`) the plugin's suite is green with 34 of them (41 runs, 0 failures; rspec 34, 0 failures) and, in production mode with 32 of them, Project > Settings, the AI summary tab, the issue list and an issue page answer 200 for admin and manager (`docs/e2e/combination/combination_geoxyz_plugins-32-plugins-*`).
+- Left out because their own patches still mix `alias_method` with other plugins' `prepend` and recurse, independent of this plugin (for their migration sessions, under the same decision): `redmine_mail_digest`, `redmine_itil_priority`, `redmine_depending_custom_fields` (`project_settings_tabs`), `redmine_tint_issues` (`Issue#css_classes` vs `redmine_agile`), and, in production only, `redmine_issue_todo_lists2` and `redmine_issue_field_visibility` (`IssueQuery#initialize_available_filters`/`available_columns` vs `redmine_agile`).
+- With all plugins a fresh database cannot be migrated in one go (a plugin reads `Setting` at boot before core's tables exist): migrate core first, then `redmine:plugins:migrate`. Other plugins' assets answer 404 in production until `assets:precompile` is run after installing them.
 
 ## Found, not fixed (outside this migration's scope)
 
-- Private notes and subtasks: the issue data sent to the provider includes all journals, private notes included, and all subtasks; the resulting summary is shown to everyone who may view the summary. See "Open questions for Jan".
+- `init.rb` still declares `requires_redmine version_or_higher: '5.0.0'`; since `a98fefa` the views need `sprite_icon` (Redmine 6+). Harmless for GEOxyz (Redmine 7 only); raising it is a one-line change.
 - `config/routes.rb` redeclares `resources :issues` and `resources :projects` without `only: []`, duplicating core routes at the end of the table (harmless, core wins).
 - Project tab: the invalid-JSON flash shows "Model parameters json is invalid" (no attribute translation); the project module shows as "Ai summary" in the modules list (no `project_module_ai_summary` key); the select option "inherit" shows as "Default" (`label_inherit` missing).
 - `SettingsTester` returns its messages in English only ("API key is missing", "Models fetched.").
@@ -276,8 +292,15 @@ Redmine 7 webhooks send core's `issues/show.api.rsb` payload. This plugin adds n
 
 ## Open questions for Jan
 
-1. **Private notes and private subtasks in summaries.** Today (upstream behaviour, unchanged) the summary is built from every journal, private notes included, and every subtask, and shown to everyone with the public `view_issue_summary` permission who may see the issue. A member without `view_private_notes` can thus read a summary of private notes. Options: (a) leave as is; (b) leave private notes and private subtasks out of the data sent; (c) show the summary only to users with `view_private_notes` when the issue has private notes. Recommendation: (b), it also sends less to the provider. Not built: it changes what summaries contain, which users may rely on.
-2. **`redmine_view_issue_description` coupling.** `da2363c` mirrors that plugin's access rule (admin, assignee, watcher access, `description_access_granted?`). Cleaner long term: that plugin exposes one method (or patches `Issue#visible?` for the detail view) that other plugins call. Recommendation: keep `da2363c` now; ask the owner of that plugin for a single public check.
+None.
+
+## Decided by Jan
+
+Decided 2026-10-07 by Jan Catrysse in the coordinating session (recorded in `docs/DECISIONS-2026-10-07.md`, relayed to this session by that session).
+
+1. **redmine_ai_summary-q1: Moeten privé-notities en privé-subtaken uit de AI-samenvatting blijven?** Jan chose B: "Privé-notities en privé-subtaken niet meesturen" (Geen lek meer en minder gegevens naar de AI-provider; samenvattingen bevatten wel minder dan vandaag.). Built in `6c8b3e8`: journals with private notes (notes and details) and private subtasks (with what hangs below them) are not sent; unit tests and `test/e2e/private_data.mjs`.
+2. **redmine_ai_summary-q2: Mag deze plugin de toegangsregel van redmine_view_issue_description blijven nabouwen?** Jan chose A: "Zo laten, later één gedeelde controle vragen" (Werkt nu en is getest; dezelfde regel staat wel op twee plekken.). Kept as built in `da2363c`; no code change. The shared check is to be asked of `redmine_view_issue_description` later.
+3. **General (every GEOxyz plugin)**: Redmine 7 only, no 5.1 backports (`a98fefa` removed the 5.1-only paths); PostgreSQL only; deface without version constraint (not used here); `prepend` instead of `alias_method` for core methods other plugins patch (`4193d80`); GitHub Actions manual only (unchanged: `rspec-51.yml` and `rspec-60.yml` are `workflow_dispatch`).
 
 ## Analysis report (2026-10-06, Dutch)
 
