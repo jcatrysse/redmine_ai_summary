@@ -5,7 +5,7 @@ Redmine::Plugin.register :redmine_ai_summary do
   version '0.3.1'
   url 'https://github.com/tuzumkuru/redmine_ai_summary'
   author_url 'https://github.com/tuzumkuru'
-  requires_redmine :version_or_higher => '5.0.0'
+  requires_redmine :version_or_higher => '6.0.0'
 
   # Plugin settings
   settings default: {
