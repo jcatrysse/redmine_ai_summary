@@ -17,16 +17,12 @@ class IssuePageAiSummaryTest < ActionController::TestCase
     get :show, params: { id: 1 }
 
     assert_response :success
-    if ApplicationHelper.method_defined?(:sprite_icon)
-      # Redmine 6+: the icon-* CSS backgrounds are gone, icons are SVG sprites.
-      assert_select '#generate-summary-button svg use[href$=?]', '#icon--summary'
-      assert_select '#regenerate-summary-button svg use[href$=?]', '#icon--summary'
-      assert_select '#issue-summary [data-action=copy_error] svg use[href$=?]', '#icon--warning'
-      assert_select '#issue-summary a[data-action=quote] svg use[href$=?]', '#icon--comment'
-      assert_select '#issue-summary a[data-action=copy] svg use[href$=?]', '#icon--copy'
-      assert_select '#issue-summary a.icon-del svg use[href$=?]', '#icon--del'
-    else
-      assert_select '#generate-summary-button.icon-summary'
-    end
+    # Redmine 6+: the icon-* CSS backgrounds are gone, icons are SVG sprites.
+    assert_select '#generate-summary-button svg use[href$=?]', '#icon--summary'
+    assert_select '#regenerate-summary-button svg use[href$=?]', '#icon--summary'
+    assert_select '#issue-summary [data-action=copy_error] svg use[href$=?]', '#icon--warning'
+    assert_select '#issue-summary a[data-action=quote] svg use[href$=?]', '#icon--comment'
+    assert_select '#issue-summary a[data-action=copy] svg use[href$=?]', '#icon--copy'
+    assert_select '#issue-summary a.icon-del svg use[href$=?]', '#icon--del'
   end
 end

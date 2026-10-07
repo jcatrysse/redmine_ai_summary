@@ -13,13 +13,7 @@ require 'rspec/rails'
 require_relative 'spec_helper'
 
 RSpec.configure do |config|
-  fixtures = File.expand_path('../../../test/fixtures', __dir__)
-  # fixture_paths needs Rails 7.1+; Redmine 5.1 (Rails 6.1) only has fixture_path.
-  if config.respond_to?(:fixture_paths=)
-    config.fixture_paths = [fixtures]
-  else
-    config.fixture_path = fixtures
-  end
+  config.fixture_paths = [File.expand_path('../../../test/fixtures', __dir__)]
   config.use_transactional_fixtures = true
   config.infer_spec_type_from_file_location!
   config.filter_rails_from_backtrace!
