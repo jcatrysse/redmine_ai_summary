@@ -63,4 +63,29 @@ class ProjectsHelperPatchTest < ActionView::TestCase
 
     refute tabs.any? { |tab| tab[:name] == 'ai_summary' }
   end
+
+  # Other GEOxyz plugins prepend project_settings_tabs too; mixing alias_method
+  # with prepend on one method recursed (Project > Settings HTTP 500).
+  def test_patch_is_prepended_not_aliased
+    assert ProjectsHelper.ancestors.index(RedmineAiSummary::Patches::ProjectsHelperPatch) <
+             ProjectsHelper.ancestors.index(ProjectsHelper)
+    refute ProjectsHelper.method_defined?(:project_settings_tabs_without_ai_summary)
+    refute ProjectsHelper.private_method_defined?(:project_settings_tabs_without_ai_summary)
+  end
+
+  def test_tab_added_once_with_another_prepended_patch
+    other = Module.new do
+      def project_settings_tabs
+        super + [{ name: 'other_plugin', partial: 'x', label: :label_x }]
+      end
+    end
+    singleton_class.prepend(other)
+    User.current = User.find(1)
+    EnabledModule.create!(project_id: @project.id, name: 'ai_summary')
+
+    names = project_settings_tabs.map { |tab| tab[:name] }
+
+    assert_equal 1, names.count('ai_summary')
+    assert_includes names, 'other_plugin'
+  end
 end

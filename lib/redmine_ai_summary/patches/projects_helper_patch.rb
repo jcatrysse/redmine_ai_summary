@@ -1,15 +1,10 @@
 module RedmineAiSummary
   module Patches
     module ProjectsHelperPatch
-      def self.included(base)
-        base.class_eval do
-          alias_method :project_settings_tabs_without_ai_summary, :project_settings_tabs
-          alias_method :project_settings_tabs, :project_settings_tabs_with_ai_summary
-        end
-      end
-
-      def project_settings_tabs_with_ai_summary
-        tabs = project_settings_tabs_without_ai_summary
+      # Prepended, not aliased: other plugins patch project_settings_tabs too,
+      # and alias_method mixed with prepend on one method recurses.
+      def project_settings_tabs
+        tabs = super
         project = @project
         return tabs unless project
 
@@ -30,6 +25,6 @@ module RedmineAiSummary
   end
 end
 
-unless ProjectsHelper.included_modules.include?(RedmineAiSummary::Patches::ProjectsHelperPatch)
-  ProjectsHelper.send(:include, RedmineAiSummary::Patches::ProjectsHelperPatch)
+unless ProjectsHelper.ancestors.include?(RedmineAiSummary::Patches::ProjectsHelperPatch)
+  ProjectsHelper.prepend(RedmineAiSummary::Patches::ProjectsHelperPatch)
 end
