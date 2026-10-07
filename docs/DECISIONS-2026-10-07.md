@@ -29,3 +29,12 @@ What to do:
 7. Update Status, the inventory, the work list and "After the upgrade". Push `redmine70-migration` after every commit.
 8. These decisions are final; do not stop to ask about them. If one turns out to be impossible, write down why in the plan and carry on with the rest.
 9. End with a short report in Dutch: per decision what you did (commit), test numbers, e2e numbers (scenarios, screenshots, problems), the review result, what is left for Jan.
+
+## Round 2, decided by Jan on 2026-10-07 (evening)
+
+Jan answered these follow-up questions from the migration report the same way, one at a time, in the coordinating session.
+
+- redmine_ai_summary-n2-1 (ai_summary 3): Nieuwe AI-samenvattingen laten privé-notities en privé-subtaken weg. Samenvattingen die al bestaan, houden hun oude tekst tot iemand ze opnieuw laat maken. Wat doen we na de upgrade met die oude samenvattingen?
+  Jan chose: "Zo laten" (Geen werk, maar oude samenvattingen kunnen privé-notities blijven tonen tot iemand ze vernieuwt.). Carry this out.
+- redmine_ai_summary-n2-2 (ai_summary 4): In de plugin staat nog dat hij vanaf Redmine 5.0 werkt, maar de schermen hebben nu Redmine 6 of hoger nodig. Voor GEOxyz maakt het niets uit. Passen we dat minimum aan?
+  Jan chose: "Naar 6.0 zetten" (Het minimum klopt dan met wat de plugin echt nodig heeft; een wijziging van één regel.). Carry this out.
