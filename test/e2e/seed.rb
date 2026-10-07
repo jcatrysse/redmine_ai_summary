@@ -22,3 +22,26 @@ unless Issue.where(project_id: project.id, subject: 'E2E private issue in public
 end
 
 puts "AI summary seed: endpoint #{settings['api_endpoint']}, model #{settings['model']}"
+
+# Decision q1 (2026-10-07): an issue with a public and a private note, a public
+# and a private subtask. Private ones must not reach the provider or the summary.
+admin = User.find_by!(login: 'admin')
+User.current = admin
+manager = User.find_by!(login: 'manager')
+parent = Issue.find_by(project_id: project.id, subject: 'E2E issue with private data')
+unless parent
+  parent = Issue.create!(project: project, tracker: project.trackers.first, author: admin,
+                         subject: 'E2E issue with private data', description: 'Public description.',
+                         priority: IssuePriority.default || IssuePriority.first)
+  [['E2E public subtask', false], ['E2E private subtask', true]].each do |subject, is_private|
+    Issue.create!(project: project, tracker: project.trackers.first, author: admin, subject: subject,
+                  description: subject, is_private: is_private, parent_issue_id: parent.id,
+                  priority: IssuePriority.default || IssuePriority.first)
+  end
+end
+[['PUBLIC NOTE visible to everyone', false], ['PRIVATE NOTE for the team only', true]].each do |notes, private_notes|
+  journal = Journal.find_or_initialize_by(journalized: parent, notes: notes)
+  journal.user = manager
+  journal.private_notes = private_notes
+  journal.save!
+end

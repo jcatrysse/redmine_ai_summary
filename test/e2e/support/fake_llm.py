@@ -70,8 +70,15 @@ class Handler(BaseHTTPRequestHandler):
                 content = 'pong'
             else:
                 time.sleep(2)  # long enough to see the "generating" state
+                notes = [n.get('notes') for n in (issue.get('notes') or []) if n.get('notes')]
+                subtasks = [t.get('subject') for t in (issue.get('subtasks') or [])]
                 content = ('*Fake summary* of "%s": %d note(s), %d subtask(s).'
                            % (issue.get('subject'), len(issue.get('notes') or []), len(issue.get('subtasks') or [])))
+                # Echo what was received, so a screenshot shows what reached the provider.
+                if notes:
+                    content += ' Notes received: ' + '; '.join('"%s"' % n for n in notes) + '.'
+                if subtasks:
+                    content += ' Subtasks received: ' + '; '.join('"%s"' % t for t in subtasks) + '.'
         self.reply(200, {'id': 'e2e', 'object': 'chat.completion', 'model': body.get('model'),
                          'choices': [{'index': 0, 'finish_reason': 'stop',
                                       'message': {'role': 'assistant', 'content': content}}]})
