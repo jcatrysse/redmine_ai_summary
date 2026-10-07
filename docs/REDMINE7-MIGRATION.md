@@ -25,7 +25,8 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Measured on | Redmine 7.0.1 (7.0-stable-GEOxyz + latest 7.0-stable), Rails 8.1.3.1, Ruby 3.3.6, PostgreSQL 16 and MariaDB 10.11 |
 | Branch head when this file was written | `8ebb268` |
 | Migration done on | 2026-10-06, branch head after the work: see `git log` (last code change `f124f16`) |
-| Plugin tests, 7.0-stable-GEOxyz (2026-10-07, after Jan's decisions) | PostgreSQL 16, plugin alone: minitest 41 runs, 103 assertions, 0 failures; rspec 34 examples, 0 failures. With 34 other GEOxyz plugins installed: the same (41/0, 34/0) |
+| Plugin tests, 7.0-stable-GEOxyz (2026-10-07, after round 2, `138fdb7`) | PostgreSQL 16, plugin alone: minitest 43 runs, 105 assertions, 0 failures; rspec 34 examples, 0 failures |
+| Plugin tests, 7.0-stable-GEOxyz (2026-10-07, after the first decisions) | PostgreSQL 16, plugin alone: minitest 41 runs, 103 assertions, 0 failures; rspec 34 examples, 0 failures. With 34 other GEOxyz plugins installed: the same (41/0, 34/0) |
 | Plugin tests, 2026-10-06 (before the decisions) | PostgreSQL 16 and MariaDB 10.11: minitest 37 runs, 0 failures; rspec 34 examples, 0 failures. MariaDB is no longer required (Jan, 2026-10-07) |
 | Plugin tests, 5.1-stable (2026-10-06 only; 5.1 no longer a target) | minitest 37 runs, 81 assertions, 0 failures (fewer assertions: the 5.1 branch of the icon test); rspec 34 examples, 0 failures |
 | E2E, 7.0-stable-GEOxyz production mode, PostgreSQL (2026-10-07) | plugin alone: smoke 13/0, core 6/0, 7 plugin scenarios with 44 screenshots and 0 problems; with 32 other GEOxyz plugins: `combination/geoxyz_plugins.mjs` 8 screenshots, 0 problems |
@@ -78,6 +79,7 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 12. DONE (`4193d80`, e2e `combination/geoxyz_plugins.mjs`). Patch `project_settings_tabs` with `prepend`.
 13. DONE (`a98fefa`). Remove the 5.1-only code paths; tests and e2e on PostgreSQL only.
 14. Nothing to build: q2 (keep `da2363c`), recorded only.
+15. DONE (`138fdb7`). Round 2: `requires_redmine` to 6.0.0. Round 2 "old summaries": nothing to build, recorded.
 
 **Checks**
 
@@ -98,7 +100,7 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
-- Summaries generated after the upgrade no longer contain private notes or private subtasks (decision q1). Existing summaries keep their text until they are regenerated; regenerate the ones that matter if old summaries may hold private information.
+- Summaries generated after the upgrade no longer contain private notes or private subtasks (decision q1). Existing summaries keep their text until someone regenerates them; Jan decided 2026-10-07 to leave them as they are ("Zo laten"), so old summaries can still show private notes until they are renewed. No action at the upgrade.
 - No data fix, no setting change and no new gem. Run `rake redmine:plugins:migrate` as usual (no new migration on this branch).
 - ActiveJob: Redmine 7 production uses Rails' default `:async` adapter (in-process threads); a summary that is being generated when the server restarts stays "generating" until someone regenerates it. Same as before; if that matters, configure a real queue adapter in `config/additional_environment.rb`.
 - The rake tasks `redmine:create_test_data` and `redmine:set_admin_password` are development helpers; do not run them in production (`create_test_data` also fails when the first other active user is not a member of its test project).
@@ -283,7 +285,6 @@ Redmine 7 webhooks send core's `issues/show.api.rsb` payload. This plugin adds n
 
 ## Found, not fixed (outside this migration's scope)
 
-- `init.rb` still declares `requires_redmine version_or_higher: '5.0.0'`; since `a98fefa` the views need `sprite_icon` (Redmine 6+). Harmless for GEOxyz (Redmine 7 only); raising it is a one-line change.
 - `config/routes.rb` redeclares `resources :issues` and `resources :projects` without `only: []`, duplicating core routes at the end of the table (harmless, core wins).
 - Project tab: the invalid-JSON flash shows "Model parameters json is invalid" (no attribute translation); the project module shows as "Ai summary" in the modules list (no `project_module_ai_summary` key); the select option "inherit" shows as "Default" (`label_inherit` missing).
 - `SettingsTester` returns its messages in English only ("API key is missing", "Models fetched.").
@@ -300,7 +301,9 @@ Decided 2026-10-07 by Jan Catrysse in the coordinating session (recorded in `doc
 
 1. **redmine_ai_summary-q1: Moeten privé-notities en privé-subtaken uit de AI-samenvatting blijven?** Jan chose B: "Privé-notities en privé-subtaken niet meesturen" (Geen lek meer en minder gegevens naar de AI-provider; samenvattingen bevatten wel minder dan vandaag.). Built in `6c8b3e8`: journals with private notes (notes and details) and private subtasks (with what hangs below them) are not sent; unit tests and `test/e2e/private_data.mjs`.
 2. **redmine_ai_summary-q2: Mag deze plugin de toegangsregel van redmine_view_issue_description blijven nabouwen?** Jan chose A: "Zo laten, later één gedeelde controle vragen" (Werkt nu en is getest; dezelfde regel staat wel op twee plekken.). Kept as built in `da2363c`; no code change. The shared check is to be asked of `redmine_view_issue_description` later.
-3. **General (every GEOxyz plugin)**: Redmine 7 only, no 5.1 backports (`a98fefa` removed the 5.1-only paths); PostgreSQL only; deface without version constraint (not used here); `prepend` instead of `alias_method` for core methods other plugins patch (`4193d80`); GitHub Actions manual only (unchanged: `rspec-51.yml` and `rspec-60.yml` are `workflow_dispatch`).
+3. **Round 2, redmine_ai_summary-n2-1 (ai_summary 3): wat doen we na de upgrade met oude samenvattingen?** Jan chose: "Zo laten" (Geen work, maar oude samenvattingen kunnen privé-notities blijven tonen tot iemand ze vernieuwt.). Nothing built; recorded under "After the upgrade".
+4. **Round 2, redmine_ai_summary-n2-2 (ai_summary 4): minimum Redmine-versie aanpassen?** Jan chose: "Naar 6.0 zetten" (Het minimum klopt dan met wat de plugin echt nodig heeft; een wijziging van één regel.). Built in `138fdb7`: `requires_redmine :version_or_higher => '6.0.0'`, with a unit test.
+5. **General (every GEOxyz plugin)**: Redmine 7 only, no 5.1 backports (`a98fefa` removed the 5.1-only paths); PostgreSQL only; deface without version constraint (not used here); `prepend` instead of `alias_method` for core methods other plugins patch (`4193d80`); GitHub Actions manual only (unchanged: `rspec-51.yml` and `rspec-60.yml` are `workflow_dispatch`).
 
 ## Analysis report (2026-10-06, Dutch)
 
